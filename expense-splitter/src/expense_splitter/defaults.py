@@ -1,6 +1,7 @@
-from decimal import Decimal
 from datetime import date
-from expense_splitter.models import Participant, Group, Purchase
+from decimal import Decimal
+
+from expense_splitter.models import Group, Participant, Purchase
 
 DEFAULT_PARTICIPANTS = [
     Participant(name="Павел"),

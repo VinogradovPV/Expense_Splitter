@@ -1,0 +1,51 @@
+purchases:
+- id: '1'
+  date: '2026-06-01'
+  title: Кофе в офис
+  amount: '1200.00'
+  payer: Павел
+  participants:
+  - Павел
+  - Сергей
+  - Владимир
+  - Максим
+  - Елена
+  - Эмилия
+  category: Напитки
+  comment: Кофе для всех
+- id: '2'
+  date: '2026-06-02'
+  title: Обед
+  amount: '1500.00'
+  payer: Елена
+  participants:
+  - Павел
+  - Сергей
+  - Владимир
+  - Максим
+  - Елена
+  - Мария
+  category: Еда
+  comment: Бизнес-ланч
+- id: '3'
+  date: '2026-06-03'
+  title: Чай
+  amount: '300.00'
+  payer: Максим
+  participants:
+  - Максим
+  - Елена
+  category: Напитки
+  comment: Зеленый чай
+- id: 780b061e
+  date: '2026-06-15'
+  title: Печенье
+  amount: '480.00'
+  payer: Сергей
+  participants:
+  - Павел
+  - Сергей
+  - Максим
+  - Елена
+  category: Еда
+  comment: null

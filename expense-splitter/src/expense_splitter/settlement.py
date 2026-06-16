@@ -1,6 +1,8 @@
 from decimal import Decimal
 from typing import List
+
 from expense_splitter.models import Balance, Settlement
+
 
 def calculate_settlements(balances: List[Balance]) -> List[Settlement]:
     """
@@ -9,11 +11,19 @@ def calculate_settlements(balances: List[Balance]) -> List[Settlement]:
     """
     # Filter out participants with zero net balance
     active_balances = [b for b in balances if b.net != Decimal("0.00")]
-    
+
     # Separate into debtors (net < 0) and creditors (net > 0)
     # Debtors owe money, so we take the absolute value for easier calculation
-    debtors = [{'name': b.participant, 'amount': -b.net} for b in active_balances if b.net < Decimal("0.00")]
-    creditors = [{'name': b.participant, 'amount': b.net} for b in active_balances if b.net > Decimal("0.00")]
+    debtors = [
+        {"name": b.participant, "amount": -b.net}
+        for b in active_balances
+        if b.net < Decimal("0.00")
+    ]
+    creditors = [
+        {"name": b.participant, "amount": b.net}
+        for b in active_balances
+        if b.net > Decimal("0.00")
+    ]
 
     settlements = []
 

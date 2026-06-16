@@ -1,7 +1,6 @@
+
 import pytest
 from typer.testing import CliRunner
-from pathlib import Path
-import yaml
 
 from expense_splitter.cli import app
 from expense_splitter.storage import load_purchases
@@ -31,18 +30,18 @@ def test_init_with_examples(temp_data_dir):
 def test_add_purchase(temp_data_dir):
     # Init first
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
-    
+
     result = runner.invoke(app, [
-        "add-purchase", 
-        "Coffee", 
-        "150.00", 
-        "Павел", 
+        "add-purchase",
+        "Coffee",
+        "150.00",
+        "Павел",
         "--group", "809 кабинет",
         "--data-dir", str(temp_data_dir)
     ])
     assert result.exit_code == 0
     assert "Added purchase: Coffee" in result.stdout
-    
+
     purchases = load_purchases(temp_data_dir / "purchases.yaml")
     assert len(purchases) == 1
     assert purchases[0].title == "Coffee"

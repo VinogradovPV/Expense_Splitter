@@ -1,22 +1,24 @@
-import typer
-from pathlib import Path
-from rich.console import Console
-from rich.table import Table
+import uuid
 from datetime import date
 from decimal import Decimal
-import uuid
+from pathlib import Path
 
-from expense_splitter.models import Purchase
-from expense_splitter.storage import (
-    load_participants, save_participants,
-    load_groups, save_groups,
-    load_purchases, save_purchases,
-    initialize_data_files
-)
-from expense_splitter.defaults import DEFAULT_PARTICIPANTS, DEFAULT_GROUPS, EXAMPLE_PURCHASES
+import typer
+from rich.console import Console
+from rich.table import Table
+
 from expense_splitter.calculator import calculate_balances
-from expense_splitter.settlement import calculate_settlements
+from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS, EXAMPLE_PURCHASES
+from expense_splitter.models import Purchase
 from expense_splitter.reporting import generate_markdown_report
+from expense_splitter.settlement import calculate_settlements
+from expense_splitter.storage import (
+    initialize_data_files,
+    load_groups,
+    load_participants,
+    load_purchases,
+    save_purchases,
+)
 
 app = typer.Typer(help="Expense Splitter CLI")
 console = Console()
@@ -60,10 +62,10 @@ def add_purchase(
     """Add a new purchase."""
     participants_list = load_participants(data_dir / 'participants.yaml')
     all_participant_names = [p.name for p in participants_list]
-    
+
     if not all_participant_names:
         all_participant_names = [p.name for p in DEFAULT_PARTICIPANTS]
-    
+
     if payer not in all_participant_names:
         console.print(f"[red]Error: Payer '{payer}' not found in participants.[/red]")
         raise typer.Exit(1)
@@ -132,13 +134,13 @@ def balances(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
     participants = load_participants(data_dir / 'participants.yaml')
     purchases = load_purchases(data_dir / 'purchases.yaml')
     all_names = [p.name for p in participants]
-    
+
     # Handle the case where participants list might be empty or missing from YAML properly in tests
     if not all_names:
         all_names = [p.name for p in DEFAULT_PARTICIPANTS]
-    
+
     bals = calculate_balances(purchases, all_names)
-    
+
     table = Table("Participant", "Paid", "Share", "Net Balance")
     for b in sorted(bals, key=lambda x: x.participant):
         color = "green" if b.net > 0 else "red" if b.net < 0 else "white"
@@ -152,17 +154,17 @@ def settle(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
     participants = load_participants(data_dir / 'participants.yaml')
     purchases = load_purchases(data_dir / 'purchases.yaml')
     all_names = [p.name for p in participants]
-    
+
     if not all_names:
         all_names = [p.name for p in DEFAULT_PARTICIPANTS]
-    
+
     bals = calculate_balances(purchases, all_names)
     settlements = calculate_settlements(bals)
-    
+
     if not settlements:
         console.print("[green]All balances are settled. No transfers required.[/green]")
         return
-        
+
     table = Table("From", "To", "Amount")
     for s in settlements:
         table.add_row(s.from_participant, s.to_participant, f"{s.amount:.2f}")
@@ -178,13 +180,13 @@ def report(
     participants = load_participants(data_dir / 'participants.yaml')
     purchases = load_purchases(data_dir / 'purchases.yaml')
     all_names = [p.name for p in participants]
-    
+
     if not all_names:
         all_names = [p.name for p in DEFAULT_PARTICIPANTS]
-    
+
     bals = calculate_balances(purchases, all_names)
     settlements = calculate_settlements(bals)
-    
+
     generate_markdown_report(purchases, bals, settlements, output)
     console.print(f"[green]Report generated at {output}[/green]")
 

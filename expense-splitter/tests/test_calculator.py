@@ -1,9 +1,10 @@
-import pytest
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
 
-from expense_splitter.models import Purchase
+import pytest
+
 from expense_splitter.calculator import calculate_balances
+from expense_splitter.models import Purchase
 
 
 def make_purchase(id_, title, amount, payer, participants, date_=None):

@@ -1,8 +1,8 @@
-from decimal import Decimal, getcontext
-from typing import List, Dict
 from collections import defaultdict
+from decimal import Decimal, getcontext
+from typing import List
 
-from expense_splitter.models import Purchase, Balance
+from expense_splitter.models import Balance, Purchase
 
 # Set precision for Decimal calculations
 getcontext().prec = 10

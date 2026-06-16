@@ -1,10 +1,11 @@
-import yaml
-from pathlib import Path
-from typing import List, Type, TypeVar, Union
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
+from pathlib import Path
+from typing import List, TypeVar
 
-from expense_splitter.models import Participant, Group, Purchase
+import yaml
+
+from expense_splitter.models import Group, Participant, Purchase
 
 T = TypeVar("T")
 
