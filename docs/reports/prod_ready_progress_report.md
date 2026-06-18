@@ -511,3 +511,34 @@ GitHub Actions:
 ### Git/GitHub
 
 Generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/`, `dist/`, `build/`, `*.egg-info`, backup-файлы) не должны попадать в staging. Push в инструкции P1.A.0 не указан.
+
+## P1.A.1 — Analytics core: периодные агрегации
+
+Дата: 2026-06-18
+Статус: выполнено локально; проверки pending.
+
+### Цель
+
+Добавить слой периодной аналитики за месяц, квартал и год без генерации Markdown/CSV/PNG отчетов на этом подэтапе.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `src/expense_splitter/analytics.py` | Добавлены `PeriodSpec`, `AnalyticsDataset`, фильтрация покупок по периоду, сводка, агрегации по категориям/плательщикам/участникам, top purchases и warnings |
+| `tests/test_analytics.py` | Добавлены regression tests для периодов, undated purchases, Decimal-агрегаций, категории `Без категории`, top purchases, warnings, balances и settlements |
+| `docs/ANALYTICS.md` | Добавлен раздел Analytics core P1.A.1 |
+| `docs/reports/prod_ready_progress_report.md` | Добавлен отчет по P1.A.1 |
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\analytics.py` | pending | будет выполнено после правок |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_analytics.py -v` | pending | будет выполнено после правок |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | pending | будет выполнено после правок |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | pending | будет выполнено после правок |
+
+### Git/GitHub
+
+Commit и push будут выполнены после успешных локальных проверок и проверки staging.
