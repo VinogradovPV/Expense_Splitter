@@ -430,7 +430,7 @@ Git/GitHub-команды выполнялись outside sandbox. Push на эт
 ## P1.0 — Data schema v2 и purchase_name
 
 Дата: 2026-06-18
-Статус: выполнено локально; staging проверен.
+Статус: выполнено, опубликовано в GitHub, CI зеленый.
 
 ### Цель
 
@@ -466,3 +466,17 @@ Git/GitHub-команды выполнялись outside sandbox. Push на эт
 ### Git/GitHub
 
 Staging P1.0 проверен: generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/`, `dist/`, `build/`, `*.egg-info`, backup-файлы) не добавлены.
+
+Commit:
+
+```text
+9e21f44 feat: add purchase_name data schema compatibility
+```
+
+Push выполнен в ветку `prod-ready/p0-p1`.
+
+GitHub Actions:
+
+| Workflow | Run | Status | Результат |
+|---|---|---|---|
+| `CI` | `27757240825` | completed | success |
