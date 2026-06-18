@@ -480,3 +480,34 @@ GitHub Actions:
 | Workflow | Run | Status | Результат |
 |---|---|---|---|
 | `CI` | `27757240825` | completed | success |
+
+## P1.A.0 — Единая палитра аналитических графиков
+
+Дата: 2026-06-18
+Статус: выполнено локально; проверки прошли.
+
+### Цель
+
+Добавить собственную единую палитру Expense Splitter для будущих аналитических PNG-графиков, чтобы отчеты не зависели от дефолтных цветов matplotlib и имели стабильные color strategies.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `src/expense_splitter/visual/__init__.py` | Создан пакет визуальных helper-модулей |
+| `src/expense_splitter/visual/palette.py` | Добавлены палитры, Expense Splitter specific maps, metadata constants и helper-функции для stable maps, периодов и статуса баланса |
+| `tests/test_palette.py` | Добавлены проверки HEX-цветов, стабильности mapping, циклического повторения палитры, периодов, статусов баланса и metadata constants |
+| `docs/ANALYTICS.md` | Зафиксированы палитра, версия и стратегии цвета для будущих PNG-графиков |
+| `docs/reports/prod_ready_progress_report.md` | Добавлен отчет по P1.A.0 |
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\visual\palette.py tests\test_palette.py` | OK outside sandbox | синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_palette.py -v` | OK outside sandbox | `9 passed in 0.04s` |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | `Text encoding check passed: UTF-8 files have no mojibake markers.` |
+
+### Git/GitHub
+
+Generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/`, `dist/`, `build/`, `*.egg-info`, backup-файлы) не должны попадать в staging. Push в инструкции P1.A.0 не указан.
