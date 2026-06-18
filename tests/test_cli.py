@@ -88,3 +88,15 @@ def test_report(temp_data_dir):
     content = report_path.read_text()
     assert "# Expense Splitter Report" in content
     assert "Summary of Balances" in content
+
+
+def test_corrupted_yaml_shows_friendly_error(temp_data_dir):
+    purchases_path = temp_data_dir / "purchases.yaml"
+    purchases_path.write_text("purchases: [\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["list-purchases", "--data-dir", str(temp_data_dir)])
+
+    assert result.exit_code == 1
+    assert "Data error in" in result.stdout
+    assert "purchases.yaml" in result.stdout
+    assert "Traceback" not in result.stdout

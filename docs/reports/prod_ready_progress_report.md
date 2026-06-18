@@ -173,6 +173,51 @@ P0.0 выполнен: локальное состояние сохранено 
 
 Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
 
+## 13. P0.3 — Data safety: atomic write, backup, corrupted YAML
+
+Дата: 2026-06-18  
+Статус: завершено.
+
+### Цель
+
+Добавить минимальную защиту пользовательских YAML-данных:
+
+- atomic write через временный файл и `os.replace`;
+- timestamped `.bak` copy перед заменой существующего YAML;
+- понятную ошибку при поврежденном YAML;
+- CLI-обработку storage errors без traceback.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `src/expense_splitter/storage.py` | добавлен `StorageError`, дружелюбная обработка YAML/OSError, backup перед заменой существующего файла, atomic write через temp file + `os.replace` |
+| `src/expense_splitter/cli.py` | команды перехватывают `StorageError` и показывают `Data error in <path>: ...` без stack trace |
+| `tests/test_storage.py` | добавлены тесты backup creation, atomic write failure и corrupted YAML |
+| `tests/test_cli.py` | добавлен тест на дружелюбную CLI-ошибку при поврежденном `purchases.yaml` |
+| `docs/Troubleshooting.md` | добавлено описание `Data error in ...` и timestamped `.bak` файлов |
+
+Сложная миграционная система и новые пользовательские backup/restore команды на этом этапе не добавлялись; они остаются для P1.1.
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\storage.py src\expense_splitter\cli.py tests\test_storage.py tests\test_cli.py` | OK | синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests/test_storage.py tests/test_cli.py -v` | OK outside sandbox | `16 passed in 0.34s` |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `31 passed in 0.35s` |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK | compileall прошел |
+
+Первый запуск pytest внутри sandbox был заблокирован `PermissionError` при создании pytest temp directory. Повтор outside sandbox прошел успешно.
+
+### Вывод
+
+P0.3 закрыт: YAML-записи теперь выполняются атомарно, существующий YAML получает timestamped `.bak` перед заменой, поврежденный YAML превращается в контролируемый `StorageError`, а CLI показывает пользователю путь к проблемному файлу без traceback.
+
+### Git/GitHub
+
+Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
+
 ## 12. P0.2 — Исправление storage/init и тестов данных
 
 Дата: 2026-06-18  

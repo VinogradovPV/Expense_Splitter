@@ -46,7 +46,9 @@ This document provides solutions to common issues you might encounter while usin
 **Solution:**
 - **Run `init` command:** If data files are missing, run `expense-splitter init --with-examples` to create default files.
 - **Check file integrity:** Open `data/participants.yaml` and `data/purchases.yaml` in a text editor to ensure they are valid YAML. Incorrect formatting can cause issues.
-- **Backup and restore:** If data is corrupted, try restoring from a backup if you have one. Otherwise, you might need to re-initialize data.
+- **Read the file path in the error:** If the CLI prints `Data error in ...`, the message includes the exact YAML file that could not be read.
+- **Use automatic `.bak` copies:** Before replacing an existing YAML file, Expense Splitter creates a timestamped `.bak` copy next to the original file. If a recent edit breaks the data file, compare it with the newest `.bak` file and restore the last known-good content manually.
+- **Backup and restore:** If data is corrupted and no usable `.bak` file exists, restore from your own backup if you have one. Otherwise, you might need to re-initialize data.
 
 ### 2.3. Incorrect calculations
 

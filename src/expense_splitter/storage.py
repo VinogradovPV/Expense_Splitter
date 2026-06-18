@@ -1,12 +1,23 @@
+import os
+import shutil
+import tempfile
 import yaml
 from pathlib import Path
-from typing import List, Type, TypeVar, Union
+from typing import List, TypeVar
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 
 from expense_splitter.models import Participant, Group, Purchase
 
 T = TypeVar("T")
+
+
+class StorageError(RuntimeError):
+    """Raised when user data cannot be safely read or written."""
+
+    def __init__(self, message: str, file_path: Path):
+        super().__init__(message)
+        self.file_path = file_path
 
 class DecimalYamlRepresenter(yaml.YAMLObject):
     yaml_tag = u'!decimal'
@@ -39,13 +50,49 @@ yaml.add_constructor(u'!date', DateYamlRepresenter.from_yaml)
 def _load_yaml_data(file_path: Path) -> dict:
     if not file_path.exists():
         return {}
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f) or {}
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as exc:
+        raise StorageError(f"Invalid YAML in {file_path}: {exc}", file_path) from exc
+    except OSError as exc:
+        raise StorageError(f"Cannot read {file_path}: {exc}", file_path) from exc
+
+    if not isinstance(data, dict):
+        raise StorageError(f"Invalid YAML structure in {file_path}: expected a mapping.", file_path)
+    return data
+
+
+def _create_backup(file_path: Path) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    backup_path = file_path.with_name(f"{file_path.name}.{timestamp}.bak")
+    shutil.copy2(file_path, backup_path)
+    return backup_path
 
 def _save_yaml_data(file_path: Path, data: dict):
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+    if file_path.exists():
+        _create_backup(file_path)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            'w',
+            encoding='utf-8',
+            dir=file_path.parent,
+            prefix=f".{file_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            temp_path = Path(f.name)
+            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(temp_path, file_path)
+    except OSError as exc:
+        if temp_path and temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        raise StorageError(f"Cannot write {file_path}: {exc}", file_path) from exc
 
 def load_participants(file_path: Path) -> List[Participant]:
     data = _load_yaml_data(file_path)

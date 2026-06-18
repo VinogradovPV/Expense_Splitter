@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 import yaml
 
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
@@ -12,6 +13,7 @@ from expense_splitter.storage import (
     save_groups,
     save_participants,
     save_purchases,
+    StorageError,
 )
 
 
@@ -88,3 +90,42 @@ def test_initialize_data_files_does_not_overwrite_existing_data(tmp_path):
     assert load_participants(participants_path) == custom_participants
     assert load_groups(participants_path) == custom_groups
     assert load_purchases(purchases_path) == [custom_purchase]
+
+
+def test_save_creates_timestamped_backup_before_replacing_yaml(tmp_path):
+    file_path = tmp_path / "participants.yaml"
+    save_participants(file_path, [Participant(name="Alice")])
+
+    save_participants(file_path, [Participant(name="Bob")])
+
+    backups = list(tmp_path.glob("participants.yaml.*.bak"))
+    assert len(backups) == 1
+    assert load_participants(backups[0]) == [Participant(name="Alice")]
+    assert load_participants(file_path) == [Participant(name="Bob")]
+
+
+def test_atomic_write_keeps_original_file_when_replace_fails(tmp_path, monkeypatch):
+    file_path = tmp_path / "participants.yaml"
+    save_participants(file_path, [Participant(name="Alice")])
+
+    def fail_replace(source, target):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr("expense_splitter.storage.os.replace", fail_replace)
+
+    with pytest.raises(StorageError, match="Cannot write"):
+        save_participants(file_path, [Participant(name="Bob")])
+
+    assert load_participants(file_path) == [Participant(name="Alice")]
+    assert not list(tmp_path.glob(".participants.yaml.*.tmp"))
+
+
+def test_load_corrupted_yaml_raises_storage_error_with_path(tmp_path):
+    file_path = tmp_path / "purchases.yaml"
+    file_path.write_text("purchases: [\n", encoding="utf-8")
+
+    with pytest.raises(StorageError) as exc_info:
+        load_purchases(file_path)
+
+    assert exc_info.value.file_path == file_path
+    assert "Invalid YAML" in str(exc_info.value)
