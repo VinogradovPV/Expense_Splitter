@@ -543,7 +543,7 @@ Commit `da4dbdc feat: add period analytics core` создан и отправл�
 ## P1.A.2 — Analytics reports: Markdown + CSV + PNG
 
 Дата: 2026-06-18  
-Статус: завершено локально; готово к commit.
+Статус: завершено; commit и push выполнены, GitHub Actions успешно пройдены.
 
 ### Изменения
 
@@ -570,3 +570,11 @@ Commit `da4dbdc feat: add period analytics core` создан и отправл�
 | Encoding | OK | UTF-8 files have no mojibake markers |
 
 Generated `reports/analytics/` добавлен в `.gitignore` и не должен попадать в staging.
+
+### Git/GitHub
+
+- Feature commit: `d707f60 feat: add analytics reports with tables and charts`.
+- Ветка: `prod-ready/p0-p1`.
+- Push: `origin/prod-ready/p0-p1`, успешно.
+- GitHub Actions CI run `27771714140`: success, job `test` завершен за 24 секунды.
+- CI annotation о переходе GitHub-hosted actions с Node.js 20 на Node.js 24 не блокирует этап и относится к будущему обновлению версий actions.
