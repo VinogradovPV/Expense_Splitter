@@ -24,7 +24,7 @@ EXAMPLE_PURCHASES = [
     Purchase(
         id="1",
         date=date(2026, 6, 1),
-        title="Кофе в офис",
+        purchase_name="Кофе в офис",
         amount=Decimal("1200.00"),
         payer="Павел",
         participants=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Эмилия"],
@@ -34,7 +34,7 @@ EXAMPLE_PURCHASES = [
     Purchase(
         id="2",
         date=date(2026, 6, 2),
-        title="Обед",
+        purchase_name="Обед",
         amount=Decimal("1500.00"),
         payer="Елена",
         participants=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Мария"],
@@ -44,7 +44,7 @@ EXAMPLE_PURCHASES = [
     Purchase(
         id="3",
         date=date(2026, 6, 3),
-        title="Чай",
+        purchase_name="Чай",
         amount=Decimal("300.00"),
         payer="Максим",
         participants=["Максим", "Елена"],

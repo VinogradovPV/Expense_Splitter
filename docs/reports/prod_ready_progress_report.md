@@ -1,6 +1,6 @@
 # Expense Splitter Production Ready Progress Report
 
-Дата: 2026-06-18  
+Дата: 2026-06-18
 Этап: P0.0 — синхронизация локального проекта и GitHub  
 Статус: завершено частично, без изменения бизнес-логики
 
@@ -427,3 +427,42 @@ Release workflow теперь использует правильную root-с�
 ### Git/GitHub
 
 Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
+## P1.0 — Data schema v2 и purchase_name
+
+Дата: 2026-06-18
+Статус: выполнено локально; staging проверен.
+
+### Цель
+
+Добавить каноническое поле `purchase_name` / «Наименование покупки» без поломки старых пользовательских `purchases.yaml`, где имя покупки хранилось в legacy-поле `title`.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `src/expense_splitter/models.py` | `Purchase` переведен на поле `purchase_name`; добавлен дефолт `н/д` и read/write property `title` как legacy alias для старых code paths |
+| `src/expense_splitter/storage.py` | `load_purchases()` мигрирует `title` в `purchase_name`; пустые/отсутствующие имена становятся `н/д`; `save_purchases()` явно пишет v2-схему без `title` |
+| `src/expense_splitter/defaults.py` | Примерные покупки переведены на `purchase_name` |
+| `src/expense_splitter/cli.py` | Аргумент добавления и таблица списка используют «Наименование покупки»; пустой ввод нормализуется в `н/д` |
+| `src/expense_splitter/launcher.py` | Интерактивный ввод использует «Наименование покупки» и нормализует пустое значение в `н/д` |
+| `src/expense_splitter/reporting.py` | Markdown-отчет выводит каноническое поле `purchase_name` |
+| `tests/test_storage.py` | Добавлены regression tests для legacy `title`, отсутствующего имени и сохранения без `title` |
+| `tests/test_cli.py` | Обновлены проверки `purchase_name`; добавлен тест пустого имени |
+| `tests/test_launcher.py` | Добавлен тест пустого имени в интерактивном launcher |
+| `docs/DATA_SCHEMA.md` | Добавлено описание YAML-схемы v2 и правил совместимости v1 |
+
+### Проверки
+
+Планируемые команды P1.0:
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\models.py src\expense_splitter\storage.py src\expense_splitter\cli.py src\expense_splitter\launcher.py` | OK outside sandbox | синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_storage.py tests\test_cli.py tests\test_launcher.py -v` | OK outside sandbox | `25 passed in 0.42s` |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `37 passed in 0.40s` |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK outside sandbox | compileall прошел |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | `Text encoding check passed: UTF-8 files have no mojibake markers.` |
+
+### Git/GitHub
+
+Staging P1.0 проверен: generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/`, `dist/`, `build/`, `*.egg-info`, backup-файлы) не добавлены.

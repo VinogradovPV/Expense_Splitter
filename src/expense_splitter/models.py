@@ -3,6 +3,8 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
+DEFAULT_PURCHASE_NAME = "н/д"
+
 @dataclass
 class Participant:
     name: str
@@ -16,14 +18,25 @@ class Group:
 class Purchase:
     id: str
     date: Optional[date]
-    title: str
     amount: Decimal
     payer: str
     participants: List[str]
-    category: Optional[str]
-    comment: Optional[str]
+    purchase_name: str = DEFAULT_PURCHASE_NAME
+    category: Optional[str] = None
+    comment: Optional[str] = None
+
+    @property
+    def title(self) -> str:
+        """Legacy read alias for pre-v2 code paths."""
+        return self.purchase_name
+
+    @title.setter
+    def title(self, value: str) -> None:
+        self.purchase_name = value
 
     def __post_init__(self):
+        purchase_name = str(self.purchase_name).strip() if self.purchase_name is not None else ""
+        self.purchase_name = purchase_name or DEFAULT_PURCHASE_NAME
         if not isinstance(self.amount, Decimal):
             raise TypeError("Amount must be a Decimal type.")
         if self.amount <= 0:

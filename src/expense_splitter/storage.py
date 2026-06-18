@@ -7,7 +7,7 @@ from typing import List, TypeVar
 from decimal import Decimal
 from datetime import date, datetime
 
-from expense_splitter.models import Participant, Group, Purchase
+from expense_splitter.models import DEFAULT_PURCHASE_NAME, Participant, Group, Purchase
 
 T = TypeVar("T")
 
@@ -116,19 +116,32 @@ def load_purchases(file_path: Path) -> List[Purchase]:
     data = _load_yaml_data(file_path)
     purchases = []
     for p in data.get('purchases', []):
+        p_dict = dict(p)
         # Convert amount to Decimal if it's not already
-        if 'amount' in p and not isinstance(p['amount'], Decimal):
-            p['amount'] = Decimal(str(p['amount']))
+        if 'amount' in p_dict and not isinstance(p_dict['amount'], Decimal):
+            p_dict['amount'] = Decimal(str(p_dict['amount']))
         # Convert date to date object if it's not already
-        if 'date' in p and isinstance(p['date'], str):
-            p['date'] = date.fromisoformat(p['date'])
-        purchases.append(Purchase(**p))
+        if 'date' in p_dict and isinstance(p_dict['date'], str):
+            p_dict['date'] = date.fromisoformat(p_dict['date'])
+        if not p_dict.get('purchase_name'):
+            p_dict['purchase_name'] = p_dict.get('title') or DEFAULT_PURCHASE_NAME
+        p_dict.pop('title', None)
+        purchases.append(Purchase(**p_dict))
     return purchases
 
 def save_purchases(file_path: Path, purchases: List[Purchase]):
     data = {'purchases': []}
     for p in purchases:
-        p_dict = p.__dict__.copy()
+        p_dict = {
+            'id': p.id,
+            'date': p.date,
+            'purchase_name': p.purchase_name,
+            'amount': p.amount,
+            'payer': p.payer,
+            'participants': p.participants,
+            'category': p.category,
+            'comment': p.comment,
+        }
         # Convert Decimal to string for YAML serialization if not handled by representer
         if isinstance(p_dict.get('amount'), Decimal):
             p_dict['amount'] = str(p_dict['amount'])

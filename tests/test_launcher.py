@@ -31,3 +31,23 @@ def test_launcher_entry_point():
     content = pyproject_path.read_text(encoding="utf-8")
     assert "expense-splitter-launcher" in content
     assert "expense_splitter.launcher:main" in content
+
+
+def test_launcher_blank_purchase_name_defaults_to_not_available(tmp_path, monkeypatch):
+    from expense_splitter.models import Participant
+    from expense_splitter.storage import load_purchases, save_participants
+    import expense_splitter.launcher as launcher
+
+    data_dir = tmp_path / "data"
+    save_participants(data_dir / "participants.yaml", [Participant(name="Alice")])
+    monkeypatch.setattr(launcher, "DATA_DIR", data_dir)
+    monkeypatch.setattr(launcher, "get_participant_names", lambda: ["Alice"])
+    monkeypatch.setattr(launcher, "get_group_names", lambda: [])
+
+    answers = iter(["   ", "10.00", "Alice", "Alice", "2026-06-18", "", ""])
+    monkeypatch.setattr(launcher.Prompt, "ask", lambda *args, **kwargs: next(answers))
+
+    launcher.add_purchase_interactive()
+
+    purchases = load_purchases(data_dir / "purchases.yaml")
+    assert purchases[0].purchase_name == "н/д"

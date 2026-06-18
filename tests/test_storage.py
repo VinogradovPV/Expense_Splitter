@@ -73,10 +73,10 @@ def test_initialize_data_files_does_not_overwrite_existing_data(tmp_path):
     custom_purchase = Purchase(
         id="p1",
         date=None,
-        title="Tea",
         amount=Decimal("10.00"),
         payer="Alice",
         participants=["Alice"],
+        purchase_name="Tea",
         category=None,
         comment=None,
     )
@@ -129,3 +129,82 @@ def test_load_corrupted_yaml_raises_storage_error_with_path(tmp_path):
 
     assert exc_info.value.file_path == file_path
     assert "Invalid YAML" in str(exc_info.value)
+
+
+def test_load_purchases_maps_legacy_title_to_purchase_name(tmp_path):
+    file_path = tmp_path / "purchases.yaml"
+    file_path.write_text(
+        yaml.safe_dump(
+            {
+                "purchases": [
+                    {
+                        "id": "p1",
+                        "date": "2026-06-18",
+                        "title": "Legacy title",
+                        "amount": "10.00",
+                        "payer": "Alice",
+                        "participants": ["Alice"],
+                        "category": None,
+                        "comment": None,
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    purchase = load_purchases(file_path)[0]
+
+    assert purchase.purchase_name == "Legacy title"
+    assert purchase.title == "Legacy title"
+
+
+def test_load_purchases_defaults_missing_purchase_name(tmp_path):
+    file_path = tmp_path / "purchases.yaml"
+    file_path.write_text(
+        yaml.safe_dump(
+            {
+                "purchases": [
+                    {
+                        "id": "p1",
+                        "date": None,
+                        "amount": "10.00",
+                        "payer": "Alice",
+                        "participants": ["Alice"],
+                        "category": None,
+                        "comment": None,
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    purchase = load_purchases(file_path)[0]
+
+    assert purchase.purchase_name == "н/д"
+
+
+def test_save_purchases_writes_purchase_name_without_legacy_title(tmp_path):
+    file_path = tmp_path / "purchases.yaml"
+    purchase = Purchase(
+        id="p1",
+        date=None,
+        amount=Decimal("10.00"),
+        payer="Alice",
+        participants=["Alice"],
+        purchase_name="Tea",
+        category=None,
+        comment=None,
+    )
+
+    save_purchases(file_path, [purchase])
+
+    raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    saved_purchase = raw["purchases"][0]
+    assert saved_purchase["purchase_name"] == "Tea"
+    assert "title" not in saved_purchase

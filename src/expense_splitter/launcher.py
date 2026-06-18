@@ -14,7 +14,7 @@ from rich.prompt import Confirm, Prompt
 from expense_splitter.calculator import calculate_balances
 from expense_splitter.cli import balances, list_purchases, settle
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
-from expense_splitter.models import Purchase
+from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
 from expense_splitter.reporting import generate_markdown_report
 from expense_splitter.settlement import calculate_settlements
 from expense_splitter.storage import (
@@ -50,7 +50,8 @@ def get_group_names():
 def add_purchase_interactive():
     console.print("[bold cyan]Добавление новой покупки[/bold cyan]")
 
-    title = Prompt.ask("Название покупки")
+    purchase_name = Prompt.ask("Наименование покупки", default=DEFAULT_PURCHASE_NAME)
+    purchase_name = purchase_name.strip() or DEFAULT_PURCHASE_NAME
 
     while True:
         amount_str = Prompt.ask("Сумма")
@@ -108,10 +109,10 @@ def add_purchase_interactive():
     new_purchase = Purchase(
         id=str(uuid.uuid4())[:8],
         date=purchase_date,
-        title=title,
         amount=amount,
         payer=payer,
         participants=target_participants,
+        purchase_name=purchase_name,
         category=category if category else None,
         comment=comment if comment else None
     )
@@ -120,7 +121,7 @@ def add_purchase_interactive():
     purchases.append(new_purchase)
     save_purchases(DATA_DIR / 'purchases.yaml', purchases)
 
-    console.print(f"\n[bold green]✓ Покупка '{title}' на сумму {amount} успешно добавлена![/bold green]")
+    console.print(f"\n[bold green]✓ Покупка '{purchase_name}' на сумму {amount} успешно добавлена![/bold green]")
 
 def generate_report_interactive():
     output_path = Path("reports/report.md")

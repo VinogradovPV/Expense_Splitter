@@ -47,9 +47,27 @@ def test_add_purchase(temp_data_dir):
     
     purchases = load_purchases(temp_data_dir / "purchases.yaml")
     assert len(purchases) == 1
+    assert purchases[0].purchase_name == "Coffee"
     assert purchases[0].title == "Coffee"
     assert purchases[0].amount == 150.00
     assert purchases[0].payer == "Павел"
+
+
+def test_add_purchase_blank_name_defaults_to_not_available(temp_data_dir):
+    runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
+
+    result = runner.invoke(app, [
+        "add-purchase",
+        "   ",
+        "150.00",
+        "Павел",
+        "--group", "809 кабинет",
+        "--data-dir", str(temp_data_dir),
+    ])
+
+    assert result.exit_code == 0
+    purchases = load_purchases(temp_data_dir / "purchases.yaml")
+    assert purchases[0].purchase_name == "н/д"
 
 def test_add_purchase_invalid_payer(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])

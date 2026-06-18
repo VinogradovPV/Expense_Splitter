@@ -10,10 +10,10 @@ def make_purchase(id_, title, amount, payer, participants, date_=None):
     return Purchase(
         id=id_,
         date=date_ or date(2026, 6, 1),
-        title=title,
         amount=Decimal(str(amount)),
         payer=payer,
         participants=participants,
+        purchase_name=title,
         category=None,
         comment=None,
     )

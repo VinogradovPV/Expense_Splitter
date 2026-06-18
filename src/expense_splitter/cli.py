@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 import uuid
 
-from expense_splitter.models import Purchase
+from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
 from expense_splitter.storage import (
     load_participants, save_participants,
     load_groups, save_groups,
@@ -55,7 +55,7 @@ def init(
 
 @app.command()
 def add_purchase(
-    title: str = typer.Argument(..., help="Title of the purchase"),
+    purchase_name: str = typer.Argument(..., help="Наименование покупки"),
     amount: str = typer.Argument(..., help="Amount of the purchase"),
     payer: str = typer.Argument(..., help="Name of the participant who paid"),
     group: str = typer.Option(None, "--group", "-g", help="Name of the group to split the expense among"),
@@ -67,6 +67,7 @@ def add_purchase(
 ):
     """Add a new purchase."""
     try:
+        purchase_name = purchase_name.strip() or DEFAULT_PURCHASE_NAME
         participants_list = load_participants(data_dir / 'participants.yaml')
         all_participant_names = [p.name for p in participants_list]
 
@@ -106,10 +107,10 @@ def add_purchase(
         new_purchase = Purchase(
             id=str(uuid.uuid4())[:8],
             date=purchase_date,
-            title=title,
             amount=purchase_amount,
             payer=payer,
             participants=target_participants,
+            purchase_name=purchase_name,
             category=category,
             comment=comment
         )
@@ -117,7 +118,7 @@ def add_purchase(
         purchases = load_purchases(data_dir / 'purchases.yaml')
         purchases.append(new_purchase)
         save_purchases(data_dir / 'purchases.yaml', purchases)
-        console.print(f"[green]Added purchase: {title} ({amount}) paid by {payer}.[/green]")
+        console.print(f"[green]Added purchase: {purchase_name} ({amount}) paid by {payer}.[/green]")
     except StorageError as error:
         handle_storage_error(error)
 
@@ -134,10 +135,10 @@ def list_purchases(data_dir: Path = typer.Option(DATA_DIR, help="Data directory"
         console.print("No purchases recorded.")
         return
 
-    table = Table("ID", "Date", "Title", "Amount", "Payer", "Participants")
+    table = Table("ID", "Date", "Наименование покупки", "Amount", "Payer", "Participants")
     for p in sorted(purchases, key=lambda x: x.date or date.min):
         date_str = p.date.isoformat() if p.date else "N/A"
-        table.add_row(p.id, date_str, p.title, f"{p.amount:.2f}", p.payer, ", ".join(p.participants))
+        table.add_row(p.id, date_str, p.purchase_name, f"{p.amount:.2f}", p.payer, ", ".join(p.participants))
     console.print(table)
 
 

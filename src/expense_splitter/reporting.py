@@ -54,14 +54,14 @@ def generate_markdown_report(
         report_lines.append("No purchases recorded.")
     else:
         report_lines.extend([
-            "| Date | Title | Payer | Amount | Participants | Category |",
+            "| Date | Purchase Name | Payer | Amount | Participants | Category |",
             "|---|---|---|---|---|---|"
         ])
         for p in sorted(purchases, key=lambda x: x.date or datetime.min.date()):
             date_str = p.date.isoformat() if p.date else "N/A"
             participants_str = ", ".join(p.participants)
             cat_str = p.category or "N/A"
-            report_lines.append(f"| {date_str} | {p.title} | {p.payer} | {p.amount:.2f} | {participants_str} | {cat_str} |")
+            report_lines.append(f"| {date_str} | {p.purchase_name} | {p.payer} | {p.amount:.2f} | {participants_str} | {cat_str} |")
             
     report_lines.append("")
     
