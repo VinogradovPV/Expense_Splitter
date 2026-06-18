@@ -29,7 +29,7 @@ def get_data_dir() -> Path:
     return DATA_DIR
 
 def handle_storage_error(error: StorageError):
-    console.print(f"[red]Data error in {error.file_path}: {error}[/red]")
+    typer.echo(f"Data error in {error.file_path}: {error}")
     raise typer.Exit(1)
 
 @app.command()

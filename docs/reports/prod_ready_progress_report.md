@@ -258,7 +258,29 @@ Ignored/generated artifacts остались вне staged scope: `.venv/`, `.py
 ### Git/GitHub
 
 Рабочая ветка: `prod-ready/p0-p1`.  
-Push и GitHub Actions verification должны быть выполнены после commit P0.6.
+Commit P0.6: `df48ffd chore: publish P0 production-ready baseline`.  
+Push выполнен в `origin/prod-ready/p0-p1`.
+
+Первый GitHub Actions run:
+
+```text
+27754823573 — CI — failure
+```
+
+Причина: Linux runner/Rich переносил длинный путь `purchases.yaml` внутри строки ошибки как `purchases.ya\nml`, из-за чего падал тест `tests/test_cli.py::test_corrupted_yaml_shows_friendly_error`.
+
+Follow-up fix: `handle_storage_error()` переведен с Rich markup на plain `typer.echo()`, чтобы пользовательская ошибка data safety не ломала путь переносом строки на CI.
+
+Локальные проверки follow-up fix:
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m pytest tests\test_cli.py::test_corrupted_yaml_shows_friendly_error -v` | OK outside sandbox | `1 passed` |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `32 passed in 0.34s` |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK outside sandbox | compileall прошел |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | UTF-8/mojibake check passed |
+
+Follow-up commit и повторная GitHub Actions verification должны быть выполнены после этого обновления.
 
 ## 15. P0.5 — PyInstaller packaging
 
