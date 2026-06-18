@@ -132,3 +132,43 @@ Git/GitHub команды выполнялись outside sandbox.
 P0.0 выполнен: локальное состояние сохранено safety commit, remote `origin` настроен, remote branches получены, PR №1 подтвержден, источник истины и безопасный план синхронизации зафиксированы.
 
 Следующий этап: P0.1 — исправление Python packaging и editable install.
+
+## 11. P0.1 — Python packaging и editable install
+
+Дата: 2026-06-18  
+Статус: завершено; editable install, import, CLI help и тесты подтверждены.
+
+### Цель
+
+Исправить P0-дефект Python packaging: нерабочий build backend `setuptools.backends.legacy:build`, из-за которого `pip install -e ".[dev]"` ранее падал до сборки editable metadata.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `pyproject.toml` | `build-backend` заменен на `setuptools.build_meta` |
+
+Бизнес-логика, `storage.py`, workflows, PyInstaller spec и тесты на этом этапе не менялись.
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `python -m pip install --upgrade pip setuptools wheel` | OK | пользователь вручную выполнил успешно; в `.venv` также доступны `setuptools 82.0.1`, `wheel 0.47.0`, `packaging 26.2` |
+| `python -m pip install -e ".[dev]"` | OK | пользователь вручную выполнил успешно; `.venv` содержит runtime/dev dependencies |
+| `.\.venv\Scripts\python.exe -m pip install --no-deps -e "."` | OK outside sandbox | editable wheel собран и установлен |
+| `.\.venv\Scripts\python.exe -c "import expense_splitter; print(expense_splitter.__file__)"` | OK | импорт идет из `src/expense_splitter/__init__.py` |
+| `.\.venv\Scripts\python.exe -m pip show expense-splitter` | OK | package metadata видит editable project location и dependencies |
+| `.\.venv\Scripts\expense-splitter.exe --help` | OK | CLI entry point работает |
+| `.\.venv\Scripts\python.exe -m expense_splitter --help` | OK | module entry point работает |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `23 passed in 0.15s` |
+
+### Вывод
+
+Изначальный P0.1-дефект build backend исправлен: editable build больше не падает на `Cannot import 'setuptools.backends.legacy'`. Package discovery из `src` подтвержден, entry points `expense-splitter` и `python -m expense_splitter` работают, тестовый набор проходит.
+
+Важное замечание: первый запуск тестов внутри sandbox падал на `PermissionError` к `C:\Users\Rockaudit\AppData\Local\Temp\pytest-of-Rockaudit`. Повтор outside sandbox прошел успешно.
+
+### Git/GitHub
+
+Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
