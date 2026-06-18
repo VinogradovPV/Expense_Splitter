@@ -12,3 +12,7 @@ reports/analytics/
 .env
 *.tmp
 ~$*.xlsx
+
+# Generated reports
+reports/
+
