@@ -171,7 +171,7 @@ P0.0 выполнен: локальное состояние сохранено 
 
 ### Git/GitHub
 
-Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
+Git/GitHub-команды выполнялись outside sandbox. Локальный commit P0.4 создан с сообщением `fix: align GitHub Actions with project layout`. Push на этом этапе не выполнялся.
 
 ## 13. P0.3 — Data safety: atomic write, backup, corrupted YAML
 
@@ -254,6 +254,51 @@ P0-дефект перезаписи `participants.yaml` исправлен. П�
 - `groups`.
 
 Повторная инициализация не перезаписывает существующие пользовательские participants, groups и purchases.
+
+### Git/GitHub
+
+Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
+## 14. P0.4 — GitHub Actions и структура remote
+
+Дата: 2026-06-18  
+Статус: выполнено локально; GitHub Actions на remote не запускались, потому что push не выполнялся.
+
+### Цель
+
+Исправить P0-дефект расхождения структуры проекта и GitHub Actions. В remote-ветке PR №1 проект был расположен во вложенной папке `expense-splitter/`, а локальная production-ready работа после P0.0 ведется в плоской структуре, где `pyproject.toml`, `src/`, `tests/`, `scripts/` и `.github/` находятся в корне репозитория.
+
+### Принятое решение
+
+Выбрана структура "проект в корне репозитория" (`working-directory: .`).
+
+Массовые перемещения файлов не выполнялись. Код приложения, `pyproject.toml`, `storage.py`, тесты, PyInstaller spec и build scripts на этом этапе не менялись.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `.github/workflows/ci.yml` | Создан root-based CI workflow: checkout, Python 3.11, editable install, pytest, compileall, проверка `expense-splitter --help` |
+| `.github/workflows/build-release.yml` | Workflow выровнен под корень репозитория: `working-directory: .`, install через `python -m pip install -e ".[dev]"`, pytest/compileall/help checks, artifact paths заменены с `expense-splitter/dist/` на `packaging/dist/*`, release upload переведен на `softprops/action-gh-release@v2` |
+| `README.md` | Добавлена короткая заметка о целевой root-структуре GitHub Actions |
+| `docs/reports/prod_ready_progress_report.md` | Добавлен отчет по P0.4 |
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -c "... yaml.safe_load ..."` | OK | оба workflow YAML-файла разобраны без ошибки |
+| `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` | OK outside sandbox | editable install успешно завершен |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `31 passed in 0.35s` |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK | compileall прошел |
+| `.\.venv\Scripts\expense-splitter.exe --help` | OK | CLI entry point доступен |
+
+Первый запуск `pip install -e ".[dev]"` внутри sandbox был заблокирован `PermissionError` в `C:\Users\Rockaudit\AppData\Local\Temp`; повтор outside sandbox прошел успешно.
+
+GitHub Actions на стороне GitHub не проверялись в этом этапе, так как push не выполнялся.
+
+### Ограничения
+
+Release workflow теперь использует правильную root-структуру и правильные artifact paths для текущих build scripts, но фактическая PyInstaller-сборка остается предметом P0.5. На P0.4 намеренно не исправлялись `packaging/expense_splitter.spec` и build scripts.
 
 ### Git/GitHub
 

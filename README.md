@@ -693,3 +693,15 @@ expense-splitter restore path/to/backup.zip
 ```
 
 Не писать роман. Роман уже написал README.
+## GitHub Actions и структура проекта
+
+Целевая production-ready структура локального проекта использует корень
+репозитория как корень Python-пакета. GitHub Actions должны запускаться из `.`
+и устанавливать пакет командой:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+Предыдущая remote-структура с вложенной папкой `expense-splitter/` не считается
+целевой production-ready структурой для локальной P0-доработки.
