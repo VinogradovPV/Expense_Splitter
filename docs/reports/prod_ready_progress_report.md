@@ -280,7 +280,19 @@ Follow-up fix: `handle_storage_error()` переведен с Rich markup на p
 | `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK outside sandbox | compileall прошел |
 | `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | UTF-8/mojibake check passed |
 
-Follow-up commit и повторная GitHub Actions verification должны быть выполнены после этого обновления.
+Follow-up commit:
+
+```text
+b8de1b4 fix: stabilize storage error output for CI
+```
+
+Повторный GitHub Actions run:
+
+```text
+27756101936 — CI — success
+```
+
+Итог P0.6: ветка `prod-ready/p0-p1` запушена, P0 baseline опубликован, GitHub Actions проверен, UTF-8/mojibake guard добавлен и проходит, generated artifacts не staged.
 
 ## 15. P0.5 — PyInstaller packaging
 
