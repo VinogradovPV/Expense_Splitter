@@ -1,18 +1,18 @@
 import pytest
 from typer.testing import CliRunner
-from pathlib import Path
-import yaml
 
 from expense_splitter.cli import app
 from expense_splitter.storage import load_groups, load_participants, load_purchases
 
 runner = CliRunner()
 
+
 @pytest.fixture
 def temp_data_dir(tmp_path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     return data_dir
+
 
 def test_init_command(temp_data_dir):
     result = runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
@@ -23,6 +23,7 @@ def test_init_command(temp_data_dir):
     assert load_participants(temp_data_dir / "participants.yaml")
     assert load_groups(temp_data_dir / "participants.yaml")
 
+
 def test_init_with_examples(temp_data_dir):
     result = runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
     assert result.exit_code == 0
@@ -30,21 +31,27 @@ def test_init_with_examples(temp_data_dir):
     purchases = load_purchases(temp_data_dir / "purchases.yaml")
     assert len(purchases) == 3
 
+
 def test_add_purchase(temp_data_dir):
     # Init first
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
-    
-    result = runner.invoke(app, [
-        "add-purchase", 
-        "Coffee", 
-        "150.00", 
-        "Павел", 
-        "--group", "809 кабинет",
-        "--data-dir", str(temp_data_dir)
-    ])
+
+    result = runner.invoke(
+        app,
+        [
+            "add-purchase",
+            "Coffee",
+            "150.00",
+            "Павел",
+            "--group",
+            "809 кабинет",
+            "--data-dir",
+            str(temp_data_dir),
+        ],
+    )
     assert result.exit_code == 0
     assert "Added purchase: Coffee" in result.stdout
-    
+
     purchases = load_purchases(temp_data_dir / "purchases.yaml")
     assert len(purchases) == 1
     assert purchases[0].purchase_name == "Coffee"
@@ -56,26 +63,43 @@ def test_add_purchase(temp_data_dir):
 def test_add_purchase_blank_name_defaults_to_not_available(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
 
-    result = runner.invoke(app, [
-        "add-purchase",
-        "   ",
-        "150.00",
-        "Павел",
-        "--group", "809 кабинет",
-        "--data-dir", str(temp_data_dir),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "add-purchase",
+            "   ",
+            "150.00",
+            "Павел",
+            "--group",
+            "809 кабинет",
+            "--data-dir",
+            str(temp_data_dir),
+        ],
+    )
 
     assert result.exit_code == 0
     purchases = load_purchases(temp_data_dir / "purchases.yaml")
     assert purchases[0].purchase_name == "н/д"
 
+
 def test_add_purchase_invalid_payer(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir)])
-    result = runner.invoke(app, [
-        "add-purchase", "Coffee", "150.00", "Unknown", "--group", "809 кабинет", "--data-dir", str(temp_data_dir)
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "add-purchase",
+            "Coffee",
+            "150.00",
+            "Unknown",
+            "--group",
+            "809 кабинет",
+            "--data-dir",
+            str(temp_data_dir),
+        ],
+    )
     assert result.exit_code == 1
     assert "Error: Payer 'Unknown' not found" in result.stdout
+
 
 def test_list_purchases(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
@@ -84,6 +108,7 @@ def test_list_purchases(temp_data_dir):
     assert "Кофе в офис" in result.stdout
     assert "Обед" in result.stdout
 
+
 def test_balances(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
     result = runner.invoke(app, ["balances", "--data-dir", str(temp_data_dir)])
@@ -91,21 +116,67 @@ def test_balances(temp_data_dir):
     assert "Net Balance" in result.stdout
     assert "Павел" in result.stdout
 
+
 def test_settle(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
     result = runner.invoke(app, ["settle", "--data-dir", str(temp_data_dir)])
     assert result.exit_code == 0
     assert "Amount" in result.stdout
 
+
 def test_report(temp_data_dir):
     runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
     report_path = temp_data_dir / "report.md"
-    result = runner.invoke(app, ["report", "--output", str(report_path), "--data-dir", str(temp_data_dir)])
+    result = runner.invoke(
+        app, ["report", "--output", str(report_path), "--data-dir", str(temp_data_dir)]
+    )
     assert result.exit_code == 0
     assert report_path.exists()
     content = report_path.read_text()
     assert "# Expense Splitter Report" in content
     assert "Summary of Balances" in content
+
+
+def test_analytics_command_generates_all_outputs(temp_data_dir, tmp_path):
+    runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])
+    output_root = tmp_path / "analytics"
+
+    result = runner.invoke(
+        app,
+        [
+            "analytics",
+            "--period",
+            "month",
+            "--year",
+            "2026",
+            "--month",
+            "6",
+            "--format",
+            "all",
+            "--output-root",
+            str(output_root),
+            "--data-dir",
+            str(temp_data_dir),
+        ],
+    )
+
+    report_dir = output_root / "2026" / "2026-06"
+    assert result.exit_code == 0
+    assert "Analytics report generated" in result.stdout
+    assert (report_dir / "analytics_report.md").exists()
+    assert (report_dir / "metadata.json").exists()
+    assert len(list((report_dir / "tables").glob("*.csv"))) == 9
+    assert len(list((report_dir / "charts").glob("*.png"))) == 6
+
+
+def test_analytics_command_validates_period_arguments(temp_data_dir):
+    result = runner.invoke(
+        app,
+        ["analytics", "--period", "month", "--year", "2026", "--data-dir", str(temp_data_dir)],
+    )
+
+    assert result.exit_code == 2
+    assert "Analytics error" in result.stdout
 
 
 def test_corrupted_yaml_shows_friendly_error(temp_data_dir):

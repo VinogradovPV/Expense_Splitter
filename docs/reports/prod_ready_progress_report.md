@@ -515,7 +515,7 @@ Generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/
 ## P1.A.1 — Analytics core: периодные агрегации
 
 Дата: 2026-06-18
-Статус: выполнено локально; проверки pending.
+Статус: завершено пользователем; проверки, commit и push выполнены успешно.
 
 ### Цель
 
@@ -534,11 +534,39 @@ Generated artifacts (`reports/`, `.pytest_cache/`, `__pycache__/`, `.ruff_cache/
 
 | Команда | Статус | Результат |
 |---|---|---|
-| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\analytics.py` | pending | будет выполнено после правок |
-| `.\.venv\Scripts\python.exe -m pytest tests\test_analytics.py -v` | pending | будет выполнено после правок |
-| `.\.venv\Scripts\python.exe -m pytest tests -v` | pending | будет выполнено после правок |
-| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | pending | будет выполнено после правок |
+| Проверки P1.A.1 | OK | пользователь подтвердил успешное прохождение всех тестов |
 
 ### Git/GitHub
 
-Commit и push будут выполнены после успешных локальных проверок и проверки staging.
+Commit `da4dbdc feat: add period analytics core` создан и отправлен пользователем.
+
+## P1.A.2 — Analytics reports: Markdown + CSV + PNG
+
+Дата: 2026-06-18  
+Статус: завершено локально; готово к commit.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `analytics_reporting.py` | Markdown, 9 CSV-таблиц, metadata.json, единый output layout |
+| `analytics_charts.py` | 6 headless PNG-графиков через matplotlib `Agg`, палитра P1.A.0, warnings при отсутствии данных |
+| CLI/launcher | Добавлена аналитика за month/quarter/year и форматы markdown/csv/png/all |
+| `pyproject.toml` | Добавлена runtime dependency `matplotlib>=3.8` |
+| tests | Добавлены проверки структуры отчетов, CSV encoding/Decimal, PNG и empty-data behavior |
+| docs | Обновлены README и `docs/ANALYTICS.md` |
+
+### Проверки
+
+| Проверка | Статус | Результат |
+|---|---|---|
+| Editable install | OK | matplotlib 3.11.0 установлен |
+| Focused pytest | OK | `33 passed` после добавления CLI regression tests |
+| Полный pytest | OK | `65 passed in 1.75s` |
+| Ruff | OK | `All checks passed!` для затронутых Python-файлов |
+| Compileall | OK | `python -m compileall -q src tests` |
+| CLI month/quarter/year | OK | созданы каталоги `2026-06`, `2026-Q2`, `2026` |
+| Empty-data warnings | OK | по 6 `chart_no_data`, генерация не падает |
+| Encoding | OK | UTF-8 files have no mojibake markers |
+
+Generated `reports/analytics/` добавлен в `.gitignore` и не должен попадать в staging.

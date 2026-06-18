@@ -705,3 +705,13 @@ python -m pip install -e ".[dev]"
 
 Предыдущая remote-структура с вложенной папкой `expense-splitter/` не считается
 целевой production-ready структурой для локальной P0-доработки.
+
+## Аналитика за период
+
+Expense Splitter создает Markdown, CSV и PNG-отчеты за месяц, квартал или год:
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format all
+```
+
+Результат сохраняется в `reports/analytics/<year>/<period-id>/`. Доступные значения `--format`: `markdown`, `csv`, `png`, `all`. CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM.

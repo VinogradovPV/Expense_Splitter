@@ -11,6 +11,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
+from expense_splitter.analytics import build_analytics_dataset, parse_period
+from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.calculator import calculate_balances
 from expense_splitter.cli import balances, list_purchases, settle
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
@@ -28,6 +30,7 @@ from expense_splitter.storage import (
 console = Console()
 DATA_DIR = Path("data")
 
+
 def open_folder(path: Path):
     """Open folder in OS file explorer."""
     path.mkdir(parents=True, exist_ok=True)
@@ -38,14 +41,17 @@ def open_folder(path: Path):
     else:
         subprocess.Popen(["xdg-open", path])
 
+
 def get_participant_names():
-    participants = load_participants(DATA_DIR / 'participants.yaml')
+    participants = load_participants(DATA_DIR / "participants.yaml")
     names = [p.name for p in participants]
     return names if names else [p.name for p in DEFAULT_PARTICIPANTS]
 
+
 def get_group_names():
-    groups = load_groups(DATA_DIR / 'participants.yaml')
+    groups = load_groups(DATA_DIR / "participants.yaml")
     return [g.name for g in groups]
+
 
 def add_purchase_interactive():
     console.print("[bold cyan]Добавление новой покупки[/bold cyan]")
@@ -76,15 +82,17 @@ def add_purchase_interactive():
     target_participants = []
 
     while not target_participants:
-        choice = Prompt.ask("Для кого покупка? (введите имя группы или список имен через запятую)", default="Все")
+        choice = Prompt.ask(
+            "Для кого покупка? (введите имя группы или список имен через запятую)", default="Все"
+        )
 
         if choice in groups:
-            loaded_groups = load_groups(DATA_DIR / 'participants.yaml')
+            loaded_groups = load_groups(DATA_DIR / "participants.yaml")
             group = next((g for g in loaded_groups if g.name == choice), None)
             if group:
                 target_participants = group.members
         elif choice == "Все" or choice.lower() == "all":
-             target_participants = all_names
+            target_participants = all_names
         else:
             parts = [p.strip() for p in choice.split(",")]
             valid = True
@@ -114,19 +122,23 @@ def add_purchase_interactive():
         participants=target_participants,
         purchase_name=purchase_name,
         category=category if category else None,
-        comment=comment if comment else None
+        comment=comment if comment else None,
     )
 
-    purchases = load_purchases(DATA_DIR / 'purchases.yaml')
+    purchases = load_purchases(DATA_DIR / "purchases.yaml")
     purchases.append(new_purchase)
-    save_purchases(DATA_DIR / 'purchases.yaml', purchases)
+    save_purchases(DATA_DIR / "purchases.yaml", purchases)
 
-    console.print(f"\n[bold green]✓ Покупка '{purchase_name}' на сумму {amount} успешно добавлена![/bold green]")
+    console.print(
+        f"\n[bold green]✓ Покупка '{purchase_name}' на сумму {amount} "
+        "успешно добавлена![/bold green]"
+    )
+
 
 def generate_report_interactive():
     output_path = Path("reports/report.md")
     all_names = get_participant_names()
-    purchases = load_purchases(DATA_DIR / 'purchases.yaml')
+    purchases = load_purchases(DATA_DIR / "purchases.yaml")
     bals = calculate_balances(purchases, all_names)
     settlements = calculate_settlements(bals)
 
@@ -135,14 +147,45 @@ def generate_report_interactive():
     if Confirm.ask("Открыть папку с отчетами?"):
         open_folder(Path("reports"))
 
+
 def check_data_interactive():
     console.print("[cyan]Проверка данных...[/cyan]")
     try:
         get_participant_names()
-        load_purchases(DATA_DIR / 'purchases.yaml')
+        load_purchases(DATA_DIR / "purchases.yaml")
         console.print("[green]Данные загружаются без ошибок.[/green]")
     except Exception as e:
         console.print(f"[red]Ошибка при чтении данных: {e}[/red]")
+
+
+def generate_analytics_interactive():
+    period = Prompt.ask("Период", choices=["month", "quarter", "year"], default="month")
+    year = int(Prompt.ask("Год", default=str(date.today().year)))
+    month = None
+    quarter = None
+    if period == "month":
+        month = int(Prompt.ask("Месяц", default=str(date.today().month)))
+    elif period == "quarter":
+        quarter = int(Prompt.ask("Квартал", choices=["1", "2", "3", "4"]))
+    output_format = Prompt.ask(
+        "Формат",
+        choices=["markdown", "csv", "png", "all"],
+        default="all",
+    )
+
+    try:
+        period_spec = parse_period(period, year, month=month, quarter=quarter)
+        participants = load_participants(DATA_DIR / "participants.yaml") or DEFAULT_PARTICIPANTS
+        groups = load_groups(DATA_DIR / "participants.yaml")
+        purchases = load_purchases(DATA_DIR / "purchases.yaml")
+        dataset = build_analytics_dataset(participants, groups, purchases, period_spec)
+        report_dir = generate_analytics_report(dataset, output_format=output_format)
+    except Exception as error:
+        console.print(f"[red]Ошибка аналитики: {error}[/red]")
+        return
+
+    console.print(f"[bold green]Аналитика создана: {report_dir}[/bold green]")
+
 
 def show_help():
     console.print("Usage: expense-splitter-launcher [OPTIONS]")
@@ -151,6 +194,7 @@ def show_help():
     console.print("")
     console.print("Options:")
     console.print("  --help, -h    Show this message and exit.")
+
 
 def main():
     if any(arg in {"--help", "-h"} for arg in sys.argv[1:]):
@@ -163,21 +207,26 @@ def main():
 
     while True:
         console.print("\n")
-        console.print(Panel.fit(
-            "[1] Добавить покупку\n"
-            "[2] Показать покупки\n"
-            "[3] Показать балансы\n"
-            "[4] Показать итоговые переводы\n"
-            "[5] Создать отчет\n"
-            "[6] Открыть папку с данными\n"
-            "[7] Открыть папку с отчетами\n"
-            "[8] Проверить данные\n"
-            "[9] Выход",
-            title="Expense Splitter Launcher",
-            border_style="cyan"
-        ))
+        console.print(
+            Panel.fit(
+                "[1] Добавить покупку\n"
+                "[2] Показать покупки\n"
+                "[3] Показать балансы\n"
+                "[4] Показать итоговые переводы\n"
+                "[5] Создать отчет\n"
+                "[6] Открыть папку с данными\n"
+                "[7] Открыть папку с отчетами\n"
+                "[8] Проверить данные\n"
+                "[9] Аналитика за период\n"
+                "[10] Выход",
+                title="Expense Splitter Launcher",
+                border_style="cyan",
+            )
+        )
 
-        choice = Prompt.ask("Выберите действие", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9"])
+        choice = Prompt.ask(
+            "Выберите действие", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+        )
 
         console.print("\n")
         if choice == "1":
@@ -197,8 +246,11 @@ def main():
         elif choice == "8":
             check_data_interactive()
         elif choice == "9":
+            generate_analytics_interactive()
+        elif choice == "10":
             console.print("[green]До свидания![/green]")
             sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

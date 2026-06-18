@@ -71,3 +71,21 @@ Core-функции:
 - Балансы и settlements строятся через существующие `calculate_balances()` и `calculate_settlements()`.
 - `None` в категории отображается как `Без категории`.
 - `purchase_name` всегда присутствует; пустые значения нормализуются моделью в `н/д`.
+
+## Analytics reports P1.A.2
+
+Команда формирует отчеты за месяц, квартал или год:
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format all
+expense-splitter analytics --period quarter --year 2026 --quarter 2 --format all
+expense-splitter analytics --period year --year 2026 --format all
+```
+
+Поддерживаются форматы `markdown`, `csv`, `png` и `all`. Результаты сохраняются в `reports/analytics/<year>/<period-id>/`.
+
+`all` создает `analytics_report.md`, `metadata.json`, девять CSV-таблиц в `tables/` и до шести PNG-графиков в `charts/`. CSV записываются в `utf-8-sig`, денежные значения имеют два знака после запятой.
+
+Графики строятся через matplotlib с backend `Agg` и единой палитрой проекта. Если за период нет данных, генерация не падает: отсутствующий график фиксируется в `tables/warnings.csv`. Кириллица отображается шрифтом DejaVu Sans, поставляемым с matplotlib; при системной подмене шрифта возможен fallback matplotlib.
+
+HTML и XLSX не входят в P1.A.2 и остаются для P2.
