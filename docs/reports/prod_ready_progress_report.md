@@ -218,6 +218,54 @@ P0.3 закрыт: YAML-записи теперь выполняются ато�
 
 Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
 
+## 15. P0.5 — PyInstaller packaging
+
+Дата: 2026-06-18  
+Статус: завершено локально; Windows-сборка проверена.
+
+### Цель
+
+Исправить P0-дефект PyInstaller packaging: `.spec` использовал неверные относительные пути, build scripts не имели единого root/output поведения, а пользовательская рабочая `data/` директория не должна была встраиваться в standalone executables как packaged data.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `packaging/expense_splitter.spec` | Пути вычисляются от `packaging/` к project root и `src/`; удалены неверные `../../src` и bundled `data/`; собираются два exe: `expense-splitter` и `expense-splitter-launcher`; UPX управляется через `PYINSTALLER_NO_UPX` |
+| `scripts/build-windows.ps1` | Скрипт работает от project root, ставит `.[dev]`, запускает PyInstaller со spec, пишет generated output в root `build/` и `dist/`, поддерживает `-NoUpx` без запрещенного `--noupx` при `.spec` |
+| `scripts/build-unix.sh` | Приведен к той же root-логике: `.venv`, editable dev install, root `build/` и `dist/`, `--noupx` через env |
+| `.github/workflows/build-release.yml` | Artifact paths обновлены с `packaging/dist/*` на фактический `dist/*` |
+| `docs/PACKAGING.md` | Обновлен под фактические команды и root-layout |
+| `src/expense_splitter/launcher.py` | Добавлен минимальный `--help`/`-h` guard для packaged smoke test без запуска интерактивного меню |
+| `tests/test_launcher.py` | Добавлен regression test, что launcher `--help` не стартует меню |
+| `docs/reports/prod_ready_progress_report.md` | Добавлен отчет по P0.5 |
+
+Бизнес-логика расчетов и storage на этом этапе не менялись.
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\cli.py src\expense_splitter\launcher.py packaging\expense_splitter.spec` | OK | синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m compileall -q src` | OK | compileall прошел |
+| `.\.venv\Scripts\python.exe -m PyInstaller --version` | OK | `6.21.0` |
+| PowerShell parser для `scripts\build-windows.ps1` | OK | синтаксис скрипта корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_launcher.py -v` | OK outside sandbox | `4 passed` |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1 -NoUpx` | OK outside sandbox | созданы `dist\expense-splitter.exe` и `dist\expense-splitter-launcher.exe` |
+| `.\dist\expense-splitter.exe --help` | OK outside sandbox | CLI help отображается |
+| `.\dist\expense-splitter-launcher.exe --help` | OK outside sandbox | launcher help отображается без запуска меню |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `32 passed in 0.36s` |
+
+Первый запуск build script без `-ExecutionPolicy Bypass` был остановлен локальной PowerShell execution policy для неподписанных скриптов. Повтор с `-ExecutionPolicy Bypass` прошел успешно.
+
+### Generated artifacts
+
+После проверочной сборки появились ignored artifacts: `dist/`, `build/`, `src/expense_splitter.egg-info/`, `__pycache__/`, `.pytest_cache/`. Они не должны staging/commit.
+
+### Git/GitHub
+
+Git/GitHub-команды выполнялись outside sandbox. Изменения P0.5 подготовлены для локального commit с сообщением `fix: repair PyInstaller packaging paths`. Push на этом этапе не выполнялся.
+
 ## 12. P0.2 — Исправление storage/init и тестов данных
 
 Дата: 2026-06-18  

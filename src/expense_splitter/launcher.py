@@ -143,7 +143,19 @@ def check_data_interactive():
     except Exception as e:
         console.print(f"[red]Ошибка при чтении данных: {e}[/red]")
 
+def show_help():
+    console.print("Usage: expense-splitter-launcher [OPTIONS]")
+    console.print("")
+    console.print("Interactive launcher for Expense Splitter.")
+    console.print("")
+    console.print("Options:")
+    console.print("  --help, -h    Show this message and exit.")
+
 def main():
+    if any(arg in {"--help", "-h"} for arg in sys.argv[1:]):
+        show_help()
+        return
+
     if not DATA_DIR.exists():
         initialize_data_files(DATA_DIR, DEFAULT_PARTICIPANTS, DEFAULT_GROUPS)
         console.print("[yellow]Созданы файлы данных по умолчанию.[/yellow]")

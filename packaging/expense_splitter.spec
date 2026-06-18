@@ -1,47 +1,55 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+from pathlib import Path
+
 block_cipher = None
+UPX_ENABLED = os.environ.get("PYINSTALLER_NO_UPX") != "1"
+
+PACKAGING_DIR = Path(SPECPATH).resolve()
+PROJECT_ROOT = PACKAGING_DIR.parent
+SRC_DIR = PROJECT_ROOT / "src"
 
 
-a = Analysis(
-    ["../../src/expense_splitter/__main__.py"],
-    pathex=["."],
-    binaries=[],
-    datas=[
-        ("../../data", "data"),
-        ("../../src/expense_splitter/defaults.py", "expense_splitter"),
-        ("../../src/expense_splitter/models.py", "expense_splitter"),
-        ("../../src/expense_splitter/storage.py", "expense_splitter"),
-        ("../../src/expense_splitter/calculator.py", "expense_splitter"),
-        ("../../src/expense_splitter/settlement.py", "expense_splitter"),
-        ("../../src/expense_splitter/reporting.py", "expense_splitter"),
-        ("../../src/expense_splitter/cli.py", "expense_splitter"),
-        ("../../src/expense_splitter/launcher.py", "expense_splitter"),
-    ],
-    hiddenimports=[],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
+def source_path(*parts):
+    return str(SRC_DIR.joinpath(*parts))
+
+
+common_analysis_kwargs = {
+    "pathex": [str(SRC_DIR), str(PROJECT_ROOT)],
+    "binaries": [],
+    # User data lives in the runtime working directory and is intentionally not bundled.
+    "datas": [],
+    "hiddenimports": [],
+    "hookspath": [],
+    "hooksconfig": {},
+    "runtime_hooks": [],
+    "excludes": [],
+    "win_no_prefer_redirects": False,
+    "win_private_assemblies": False,
+    "cipher": block_cipher,
+    "noarchive": False,
+}
+
+
+cli_analysis = Analysis(
+    [source_path("expense_splitter", "__main__.py")],
+    **common_analysis_kwargs,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+cli_pyz = PYZ(cli_analysis.pure, cli_analysis.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+cli_exe = EXE(
+    cli_pyz,
+    cli_analysis.scripts,
+    cli_analysis.binaries,
+    cli_analysis.zipfiles,
+    cli_analysis.datas,
     [],
     name="expense-splitter",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=UPX_ENABLED,
     upx_exclude=[],
     runtime_info=None,
     console=True,
@@ -52,46 +60,24 @@ exe = EXE(
     entitlements_file=None,
 )
 
-# Launcher for UX
-launcher_a = Analysis(
-    ["../../src/expense_splitter/launcher.py"],
-    pathex=["."],
-    binaries=[],
-    datas=[
-        ("../../data", "data"),
-        ("../../src/expense_splitter/defaults.py", "expense_splitter"),
-        ("../../src/expense_splitter/models.py", "expense_splitter"),
-        ("../../src/expense_splitter/storage.py", "expense_splitter"),
-        ("../../src/expense_splitter/calculator.py", "expense_splitter"),
-        ("../../src/expense_splitter/settlement.py", "expense_splitter"),
-        ("../../src/expense_splitter/reporting.py", "expense_splitter"),
-        ("../../src/expense_splitter/cli.py", "expense_splitter"),
-        ("../../src/expense_splitter/launcher.py", "expense_splitter"),
-    ],
-    hiddenimports=[],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
+launcher_analysis = Analysis(
+    [source_path("expense_splitter", "launcher.py")],
+    **common_analysis_kwargs,
 )
-launcher_pyz = PYZ(launcher_a.pure, launcher_a.zipped_data, cipher=block_cipher)
+launcher_pyz = PYZ(launcher_analysis.pure, launcher_analysis.zipped_data, cipher=block_cipher)
 
 launcher_exe = EXE(
     launcher_pyz,
-    launcher_a.scripts,
-    launcher_a.binaries,
-    launcher_a.zipfiles,
-    launcher_a.datas,
+    launcher_analysis.scripts,
+    launcher_analysis.binaries,
+    launcher_analysis.zipfiles,
+    launcher_analysis.datas,
     [],
     name="expense-splitter-launcher",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=UPX_ENABLED,
     upx_exclude=[],
     runtime_info=None,
     console=True,

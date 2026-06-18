@@ -11,6 +11,17 @@ def test_launcher_main_exists():
     assert hasattr(expense_splitter.launcher, "main")
     assert callable(expense_splitter.launcher.main)
 
+def test_launcher_help_does_not_start_menu(monkeypatch, capsys):
+    import expense_splitter.launcher
+
+    monkeypatch.setattr("sys.argv", ["expense-splitter-launcher", "--help"])
+
+    expense_splitter.launcher.main()
+
+    output = capsys.readouterr().out
+    assert "Usage: expense-splitter-launcher" in output
+    assert "Interactive launcher" in output
+
 def test_launcher_entry_point():
     from pathlib import Path
 

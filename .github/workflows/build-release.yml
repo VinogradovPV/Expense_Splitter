@@ -43,7 +43,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: expense-splitter-linux
-        path: packaging/dist/*
+        path: dist/*
         if-no-files-found: error
 
   build-windows:
@@ -83,7 +83,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: expense-splitter-windows
-        path: packaging/dist/*
+        path: dist/*
         if-no-files-found: error
 
   release:
