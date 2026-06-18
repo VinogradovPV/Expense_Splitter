@@ -218,6 +218,48 @@ P0.3 закрыт: YAML-записи теперь выполняются ато�
 
 Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
 
+## 16. P0.6 — GitHub push, CI verification, UTF-8/mojibake baseline
+
+Дата: 2026-06-18  
+Статус: локальные проверки выполнены; branch подготовлен к push.
+
+### Цель
+
+Зафиксировать P0 production-ready baseline, добавить UTF-8/mojibake guard, перейти на рабочую ветку `prod-ready/p0-p1`, отправить изменения в GitHub и проверить GitHub Actions.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `scripts/qa/check_text_encoding.py` | Добавлен UTF-8/mojibake checker для tracked text baseline; generated/ignored директории пропускаются |
+| `docs/prompts/expense_splitter_prod_ready_system_prompt_v5.md` | Добавлен v5 управляющий документ; исправлены признаки mojibake в тексте |
+| `docs/prompts/expense_splitter_prod_ready_step_by_step_v5_ru.md` | Добавлен v5 пошаговый документ |
+| `docs/reports/prod_ready_progress_report.md` | Добавлен отчет P0.6 |
+
+Старые v1 prompt-файлы заменены v5-документами. Generated artifacts не staging/commit.
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` | OK outside sandbox | editable install успешно завершен |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `32 passed in 0.40s` |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK outside sandbox | compileall прошел |
+| `.\.venv\Scripts\expense-splitter.exe --help` | OK outside sandbox | CLI help отображается |
+| `.\.venv\Scripts\expense-splitter-launcher.exe --help` | OK outside sandbox | launcher help отображается |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | UTF-8/mojibake check passed |
+
+Перед проверками включались `PYTHONUTF8=1`, `PYTHONIOENCODING=utf-8`, UTF-8 console output и `chcp 65001`.
+
+### Generated artifacts
+
+Ignored/generated artifacts остались вне staged scope: `.venv/`, `.pytest_cache/`, `build/`, `dist/`, `__pycache__/`, `*.egg-info/`, untracked `reports/`.
+
+### Git/GitHub
+
+Рабочая ветка: `prod-ready/p0-p1`.  
+Push и GitHub Actions verification должны быть выполнены после commit P0.6.
+
 ## 15. P0.5 — PyInstaller packaging
 
 Дата: 2026-06-18  
