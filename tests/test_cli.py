@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 
 from expense_splitter.cli import app
-from expense_splitter.storage import load_purchases
+from expense_splitter.storage import load_groups, load_participants, load_purchases
 
 runner = CliRunner()
 
@@ -20,6 +20,8 @@ def test_init_command(temp_data_dir):
     assert "Initialized data" in result.stdout
     assert (temp_data_dir / "participants.yaml").exists()
     assert (temp_data_dir / "purchases.yaml").exists()
+    assert load_participants(temp_data_dir / "participants.yaml")
+    assert load_groups(temp_data_dir / "participants.yaml")
 
 def test_init_with_examples(temp_data_dir):
     result = runner.invoke(app, ["init", "--data-dir", str(temp_data_dir), "--with-examples"])

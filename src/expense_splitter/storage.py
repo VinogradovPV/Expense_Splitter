@@ -52,7 +52,8 @@ def load_participants(file_path: Path) -> List[Participant]:
     return [Participant(**p) for p in data.get('participants', [])]
 
 def save_participants(file_path: Path, participants: List[Participant]):
-    data = {'participants': [p.__dict__ for p in participants]}
+    data = _load_yaml_data(file_path)
+    data['participants'] = [p.__dict__ for p in participants]
     _save_yaml_data(file_path, data)
 
 def load_groups(file_path: Path) -> List[Group]:
@@ -60,7 +61,8 @@ def load_groups(file_path: Path) -> List[Group]:
     return [Group(**g) for g in data.get('groups', [])]
 
 def save_groups(file_path: Path, groups: List[Group]):
-    data = {'groups': [g.__dict__ for g in groups]}
+    data = _load_yaml_data(file_path)
+    data['groups'] = [g.__dict__ for g in groups]
     _save_yaml_data(file_path, data)
 
 def load_purchases(file_path: Path) -> List[Purchase]:

@@ -172,3 +172,44 @@ P0.0 выполнен: локальное состояние сохранено 
 ### Git/GitHub
 
 Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
+
+## 12. P0.2 — Исправление storage/init и тестов данных
+
+Дата: 2026-06-18  
+Статус: завершено.
+
+### Цель
+
+Исправить P0-дефект `initialize_data_files()`: при первичной инициализации `participants.yaml` терял список участников, потому что `save_groups()` перезаписывал файл после `save_participants()`.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `src/expense_splitter/storage.py` | `save_participants()` и `save_groups()` теперь обновляют только свою секцию YAML и сохраняют остальные ключи |
+| `tests/test_storage.py` | добавлены regression tests для `initialize_data_files()`, сохранения participants/groups и защиты от перезаписи существующих данных |
+| `tests/test_cli.py` | `test_init_command` теперь проверяет, что CLI `init` создает не только файлы, но и обе секции: participants и groups |
+
+Бизнес-логика расчетов, `pyproject.toml`, workflows и PyInstaller spec на этом этапе не менялись.
+
+### Проверки
+
+| Команда | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m pytest tests/test_storage.py tests/test_cli.py -v` | OK outside sandbox | `12 passed in 0.16s` |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK outside sandbox | `27 passed in 0.17s` |
+
+Первый запуск pytest внутри sandbox был заблокирован `PermissionError` при создании pytest temp directory. Повтор outside sandbox прошел успешно.
+
+### Вывод
+
+P0-дефект перезаписи `participants.yaml` исправлен. После `init` файл `participants.yaml` содержит обе секции:
+
+- `participants`;
+- `groups`.
+
+Повторная инициализация не перезаписывает существующие пользовательские participants, groups и purchases.
+
+### Git/GitHub
+
+Git/GitHub-команды выполнялись outside sandbox. Push на этом этапе не выполнялся.
