@@ -110,7 +110,7 @@ Commit, push и GitHub Actions не выполняются до фиксации
 ## P2.A.1 — Static HTML analytics report
 
 Дата: 2026-06-19
-Статус: реализовано локально; quality gate пройден, публикация pending.
+Статус: завершено, опубликовано, CI success.
 
 ### Цель
 
@@ -140,7 +140,12 @@ Commit, push и GitHub Actions не выполняются до фиксации
 | PNG visual QA | OK; `spending_by_category.png` читаем |
 | HTML browser QA | Ограничение среды: встроенный браузер недоступен; source/offline contracts проверены тестами |
 
-Commit hash, push и GitHub Actions фиксируются после публикации.
+### Git/GitHub
+
+- Feature commit: `21f2805 feat: add static HTML analytics report`.
+- Push: выполнен в `origin/prod-ready/p0-p1`.
+- GitHub Actions: success, run `27832179730`.
+- Generated `reports/` и пользовательские YAML не staged.
 
 ### Ограничения
 
