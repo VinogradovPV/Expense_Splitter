@@ -578,3 +578,38 @@ Generated `reports/analytics/` добавлен в `.gitignore` и не долж
 - Push: `origin/prod-ready/p0-p1`, успешно.
 - GitHub Actions CI run `27771714140`: success, job `test` завершен за 24 секунды.
 - CI annotation о переходе GitHub-hosted actions с Node.js 20 на Node.js 24 не блокирует этап и относится к будущему обновлению версий actions.
+
+## P1.A.3 — Документация аналитики и пользовательский smoke-test
+
+Дата: 2026-06-19
+Статус: выполнено локально; готово к commit.
+
+### Цель
+
+Довести пользовательскую документацию по аналитике до понятного состояния и провести smoke-test на Windows.
+
+### Изменения
+
+| Файл | Изменение |
+|---|---|
+| `README.md` | Уточнен пользовательский раздел аналитики за период; убран старый placeholder-шаблон |
+| `docs/ANALYTICS.md` | Добавлен пользовательский workflow P1.A.3 и ожидаемый результат smoke-test |
+| `docs/USER_GUIDE.md` | Добавлено руководство пользователя по аналитике, таблицам, графикам, `purchase_name`, `н/д`, HTML/XLSX P2 и generated reports |
+| `docs/Troubleshooting.md` | Добавлены подсказки по mojibake, отсутствующим PNG и удалению generated analytics reports |
+| `docs/reports/prod_ready_progress_report.md` | Зафиксирован этап P1.A.3 |
+
+### Проверки
+
+| Команда / проверка | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\expense-splitter.exe analytics --period month --year 2026 --month 6 --format all` | OK outside sandbox | создан `reports\analytics\2026\2026-06` |
+| Ручная проверка пользователя | OK | таблицы и отчеты строятся; PNG не построены из-за отсутствия данных за период |
+| `reports\analytics\2026\2026-06\tables\warnings.csv` | OK | 6 строк `chart_no_data` для обязательных PNG |
+| Placeholder scan | OK | пользовательские docs не содержат `TODO`, `PLACEHOLDER`, `passed/failed`, `- ...` |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK outside sandbox | UTF-8 files have no mojibake markers |
+| `git status --short --ignored` | OK outside sandbox | generated reports остаются ignored и не должны попасть в staging |
+| `git diff --check` | OK outside sandbox | whitespace errors не найдены |
+
+### Ограничения
+
+HTML dashboard и XLSX report остаются P2. Generated reports в `reports/analytics/` не коммитятся.

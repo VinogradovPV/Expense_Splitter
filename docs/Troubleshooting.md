@@ -46,7 +46,7 @@ This document provides solutions to common issues you might encounter while usin
 **Solution:**
 - **Run `init` command:** If data files are missing, run `expense-splitter init --with-examples` to create default files.
 - **Check file integrity:** Open `data/participants.yaml` and `data/purchases.yaml` in a text editor to ensure they are valid YAML. Incorrect formatting can cause issues.
-- **Read the file path in the error:** If the CLI prints `Data error in ...`, the message includes the exact YAML file that could not be read.
+- **Read the file path in the error:** If the CLI prints `Data error in <path>`, the message includes the exact YAML file that could not be read.
 - **Use automatic `.bak` copies:** Before replacing an existing YAML file, Expense Splitter creates a timestamped `.bak` copy next to the original file. If a recent edit breaks the data file, compare it with the newest `.bak` file and restore the last known-good content manually.
 - **Backup and restore:** If data is corrupted and no usable `.bak` file exists, restore from your own backup if you have one. Otherwise, you might need to re-initialize data.
 
@@ -77,6 +77,40 @@ This document provides solutions to common issues you might encounter while usin
 - Try building without UPX compression by adding `--noupx` to the build command (e.g., `.\scripts\build-windows.ps1 --noupx`).
 
 ## 4. Getting Help
+
+## 5. Analytics Reports
+
+### 5.1. Mojibake in PowerShell or CSV
+
+**Problem:** Russian text looks like unreadable replacement symbols or mixed Latin/Cyrillic noise.
+
+**Solution:**
+- Prefer opening CSV files from `reports/analytics/<year>/<period-id>/tables/` in Excel; they are written as `utf-8-sig`.
+- In PowerShell, switch the console to UTF-8 before running checks:
+
+```powershell
+chcp 65001
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+```
+
+### 5.2. No PNG charts were created
+
+**Problem:** `charts/` is empty after running analytics.
+
+**Solution:** Check `tables/warnings.csv`. If the period has no purchases, Expense Splitter writes `chart_no_data` warnings instead of creating empty charts.
+
+### 5.3. Removing generated analytics reports
+
+Generated analytics reports are not source files. To remove them locally:
+
+```powershell
+Remove-Item -Recurse -Force reports\analytics
+```
+
+Do not delete `data/participants.yaml` or `data/purchases.yaml` unless you intentionally want to remove user data.
 
 If you encounter an issue not covered here, or if the solutions provided do not resolve your problem, please:
 

@@ -89,3 +89,22 @@ expense-splitter analytics --period year --year 2026 --format all
 Графики строятся через matplotlib с backend `Agg` и единой палитрой проекта. Если за период нет данных, генерация не падает: отсутствующий график фиксируется в `tables/warnings.csv`. Кириллица отображается шрифтом DejaVu Sans, поставляемым с matplotlib; при системной подмене шрифта возможен fallback matplotlib.
 
 HTML и XLSX не входят в P1.A.2 и остаются для P2.
+
+## Пользовательский workflow P1.A.3
+
+Минимальный пользовательский smoke-test на Windows:
+
+```powershell
+.\.venv\Scripts\expense-splitter.exe analytics --period month --year 2026 --month 6 --format all
+Get-ChildItem reports\analytics -Recurse
+```
+
+Ожидаемый результат:
+
+- создан каталог `reports/analytics/2026/2026-06/`;
+- есть `analytics_report.md` и `metadata.json`;
+- есть папка `tables/` с обязательными CSV;
+- есть папка `charts/` с PNG, если за период есть данные;
+- если графики не созданы из-за отсутствия данных, в `tables/warnings.csv` есть строки `chart_no_data`.
+
+Подробное пользовательское руководство находится в `docs/USER_GUIDE.md`.

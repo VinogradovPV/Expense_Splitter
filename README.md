@@ -1,4 +1,4 @@
-# Инструкция для Manus: этап 2 — установщик, UX launcher, полный README и улучшения проекта Expense Splitter
+# Проект Expense Splitter
 
 ## 0. Цель этапа
 
@@ -658,41 +658,22 @@ expense-splitter restore path/to/backup.zip
 
 ---
 
-## 13. Финальное сообщение Manus
+## 13. Текущее состояние production-ready доработки
 
-В конце вывести кратко:
+Проект ведется в ветке `prod-ready/p0-p1`. Базовые P0-исправления, schema v2 и P1.A-аналитика уже опубликованы в GitHub и проверяются через GitHub Actions.
 
-```markdown
-## Stage 2 completed
+Основные пользовательские команды:
 
-### Implemented
-- ...
-
-### Files changed
-- ...
-
-### Checks
-- `python -m pytest` — passed/failed
-- `python -m ruff check .` — passed/failed
-
-### Git
-- Branch:
-- Commits:
-- Remote:
-- Push:
-- PR:
-
-### User commands
 ```powershell
 .\scripts\install.ps1
 .\scripts\run-launcher.ps1
+expense-splitter analytics --period month --year 2026 --month 6 --format all
 ```
 
-### Remaining limitations
-- ...
-```
+Ограничения текущей версии:
 
-Не писать роман. Роман уже написал README.
+- HTML dashboard и XLSX-отчет отложены на P2.
+- Сгенерированные отчеты в `reports/analytics/` не являются исходниками и не коммитятся.
 ## GitHub Actions и структура проекта
 
 Целевая production-ready структура локального проекта использует корень
@@ -712,6 +693,19 @@ Expense Splitter создает Markdown, CSV и PNG-отчеты за меся�
 
 ```powershell
 expense-splitter analytics --period month --year 2026 --month 6 --format all
+expense-splitter analytics --period quarter --year 2026 --quarter 2 --format all
+expense-splitter analytics --period year --year 2026 --format all
 ```
 
-Результат сохраняется в `reports/analytics/<year>/<period-id>/`. Доступные значения `--format`: `markdown`, `csv`, `png`, `all`. CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM.
+Результат сохраняется в `reports/analytics/<year>/<period-id>/`. Доступные значения `--format`: `markdown`, `csv`, `png`, `all`.
+
+Что создается:
+
+- `analytics_report.md`;
+- `metadata.json`;
+- CSV-таблицы в `tables/`;
+- PNG-графики в `charts/`, если за период есть данные.
+
+CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM. Если график не создан из-за отсутствия данных, причина записывается в `tables/warnings.csv`.
+
+Подробнее: `docs/USER_GUIDE.md` и `docs/ANALYTICS.md`.
