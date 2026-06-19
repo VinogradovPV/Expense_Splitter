@@ -651,6 +651,6 @@ HTML dashboard и XLSX report остаются P2. Generated reports в `reports
 ### Git/GitHub
 
 - Commit hash: текущий `HEAD` после commit `feat: add settlement periods`; точный hash зафиксирован в финальном ответе этапа.
-- Push: pending.
-- GitHub Actions: pending.
+- Push: `origin/prod-ready/p0-p1`, успешно.
+- GitHub Actions: CI run `27811016567`, success.
 - Generated artifacts: не должны попадать в staging.
