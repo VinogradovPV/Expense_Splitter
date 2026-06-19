@@ -168,6 +168,13 @@ reset-test не очищает.
 Отсутствующий PNG при пустом периоде не является ошибкой — HTML показывает сообщение об отсутствии
 данных. Отчёт не выполняет сетевых запросов и работает offline.
 
+### 5.7. XLSX не открывается или кнопка недоступна
+
+Сначала создайте отчёт с `--format xlsx` либо `--format all`. GUI ищет файл
+`expense_analytics_<period-id>.xlsx` в последней созданной папке отчёта. Для просмотра нужно
+XLSX-совместимое приложение, но генерация не требует Microsoft Excel. При повреждении файла
+повторите генерацию; generated `reports/` можно безопасно пересоздать.
+
 If you encounter an issue not covered here, or if the solutions provided do not resolve your problem, please:
 
 1.  **Check the GitHub Issues**: Someone else might have already reported a similar issue.

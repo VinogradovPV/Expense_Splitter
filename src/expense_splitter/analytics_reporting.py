@@ -10,9 +10,10 @@ from typing import Iterable, Sequence
 from expense_splitter.analytics import AnalyticsDataset
 from expense_splitter.analytics_charts import generate_analytics_charts
 from expense_splitter.analytics_html import write_html_report
+from expense_splitter.analytics_xlsx import write_xlsx_report
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
-SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "all"}
+SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "all"}
 CSV_ENCODING = "utf-8-sig"
 
 
@@ -24,7 +25,7 @@ def generate_analytics_report(
     """Generate requested analytics artifacts and return the period report directory."""
     format_key = output_format.lower()
     if format_key not in SUPPORTED_FORMATS:
-        raise ValueError("Format must be one of: markdown, csv, png, html, all.")
+        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, all.")
 
     report_dir = output_root / str(dataset.period_spec.year) / dataset.period_spec.period_id
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -36,12 +37,12 @@ def generate_analytics_report(
         for stale_dir in (report_dir / "tables", report_dir / "charts"):
             stale_dir.mkdir(parents=True, exist_ok=True)
 
-    if format_key in {"png", "html", "all"}:
+    if format_key in {"png", "html", "xlsx", "all"}:
         chart_paths, chart_warnings = generate_analytics_charts(dataset, report_dir / "charts")
         generated.extend(chart_paths)
         warnings.extend(chart_warnings)
 
-    if format_key in {"csv", "html", "all"}:
+    if format_key in {"csv", "html", "xlsx", "all"}:
         generated.extend(write_csv_tables(dataset, report_dir / "tables", warnings))
     elif format_key == "png" and warnings:
         generated.append(write_warnings_csv(report_dir / "tables" / "warnings.csv", warnings))
@@ -59,6 +60,18 @@ def generate_analytics_report(
                 warnings,
             )
         )
+
+    if format_key in {"xlsx", "all"}:
+        generated.append(
+            write_xlsx_report(
+                dataset,
+                report_dir / f"expense_analytics_{dataset.period_spec.period_id}.xlsx",
+                report_dir / "tables",
+                report_dir / "charts",
+            )
+        )
+
+    if bundle_format:
         metadata_path = report_dir / "metadata.json"
         generated.append(metadata_path)
         write_metadata(dataset, metadata_path, generated, warnings, report_dir)

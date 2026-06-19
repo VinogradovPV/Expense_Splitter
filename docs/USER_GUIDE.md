@@ -88,6 +88,10 @@ CSV записываются в `utf-8-sig`, поэтому обычно кор�
 Offline HTML dashboard доступен через `--format html` и входит в `--format all`. Его можно открыть
 двойным кликом или кнопкой GUI `Открыть HTML` после генерации. XLSX-отчёт запланирован на P2.A.2.
 
+XLSX-отчёт доступен через `--format xlsx` и также входит в `--format all`. После генерации его
+можно открыть кнопкой GUI `Открыть XLSX`. Microsoft Excel для создания файла не требуется;
+просмотр поддерживается Excel, LibreOffice Calc и другими XLSX-совместимыми приложениями.
+
 ## Generated reports и Git
 
 Папка `reports/analytics/` является generated artifact и не должна попадать в commit. Перед коммитом проверяйте:

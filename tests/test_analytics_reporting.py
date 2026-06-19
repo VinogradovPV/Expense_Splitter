@@ -36,6 +36,7 @@ def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
     assert (report_dir / "analytics_report.md").is_file()
     assert (report_dir / "metadata.json").is_file()
     assert (report_dir / "analytics_dashboard.html").is_file()
+    assert (report_dir / "expense_analytics_2026-06.xlsx").is_file()
     assert {path.name for path in (report_dir / "tables").glob("*.csv")} == {
         "summary.csv",
         "purchases.csv",

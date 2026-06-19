@@ -253,3 +253,16 @@ def open_html_report(report_dir: Path) -> None:
         subprocess.Popen(["open", str(html_path)])
     else:
         subprocess.Popen(["xdg-open", str(html_path)])
+
+
+def open_xlsx_report(report_dir: Path) -> None:
+    matches = sorted(report_dir.glob("expense_analytics_*.xlsx"))
+    if not matches:
+        raise FileNotFoundError("XLSX-отчёт не создан. Сначала выберите формат XLSX или all.")
+    xlsx_path = matches[0]
+    if platform.system() == "Windows":
+        os.startfile(xlsx_path)  # type: ignore[attr-defined]
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", str(xlsx_path)])
+    else:
+        subprocess.Popen(["xdg-open", str(xlsx_path)])

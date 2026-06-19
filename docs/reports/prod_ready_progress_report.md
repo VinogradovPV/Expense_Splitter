@@ -151,6 +151,37 @@ Commit, push и GitHub Actions не выполняются до фиксации
 
 HTML статический: фильтры и интерактивные графики намеренно отсутствуют. XLSX перенесён в P2.A.2.
 
+## P2.A.2 — XLSX analytics report
+
+Дата: 2026-06-19
+Статус: реализовано локально; quality gate пройден, публикация pending.
+
+### Цель
+
+Добавить Excel/XLSX-отчёт аналитики за месяц, квартал и год без COM automation и зависимости от
+установленного Microsoft Excel.
+
+### Изменённые области
+
+- `analytics_xlsx.py` — workbook renderer на `openpyxl` с десятью листами и PNG-графиками.
+- Reporting/CLI/GUI — формат `xlsx`, обновлённый `all`, действие `Открыть XLSX`.
+- `pyproject.toml` — runtime dependency `openpyxl>=3.1`.
+- XLSX/CLI/regression tests и русскоязычная документация.
+
+### Quality gate
+
+- Editable install: OK, `openpyxl 3.1.5`.
+- Фокусные XLSX tests: `4 passed`.
+- Полный pytest: `95 passed`.
+- Compileall: OK.
+- Encoding/mojibake: OK.
+- Ruff: OK.
+- CLI month/quarter/year `--format xlsx`: OK.
+- CLI month `--format all`: OK, XLSX включён.
+- Workbook QA через `openpyxl.load_workbook`: 10 листов, 6 PNG, filters/freeze panes OK.
+
+Commit, push и GitHub Actions фиксируются после публикации.
+
 # Expense Splitter Production Ready Progress Report
 
 Дата: 2026-06-18

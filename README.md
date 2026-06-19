@@ -745,6 +745,17 @@ expense-splitter analytics --period month --year 2026 --month 6 --format html
 
 Файл `reports/analytics/<year>/<period-id>/analytics_dashboard.html` содержит summary cards,
 warnings, таблицы, локальные PNG и ссылки на CSV/Markdown. Формат `all` также включает HTML.
+
+### XLSX-отчёт
+
+Excel-отчёт без зависимости от установленного Microsoft Excel создаётся командой:
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format xlsx
+```
+
+Файл `expense_analytics_<period-id>.xlsx` содержит сводку, детальные таблицы, балансы, переводы,
+предупреждения и лист `Charts` с локальными PNG. Формат `all` также включает XLSX.
 ## Периоды взаиморасчетов
 
 Expense Splitter поддерживает безопасное закрытие плавающего периода взаиморасчетов без удаления покупок. Закрытые покупки остаются в истории, но по умолчанию исключаются из текущих `balances` и `settle`.

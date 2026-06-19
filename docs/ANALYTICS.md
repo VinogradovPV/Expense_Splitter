@@ -15,6 +15,17 @@ expense-splitter analytics --period year --year 2026 --format html
 `--format html` и `--format all` создают полный комплект Markdown/metadata/CSV/доступных PNG/HTML.
 Если данных для графика нет, HTML показывает понятное сообщение вместо битого изображения.
 
+## XLSX
+
+Формат `xlsx` создаёт `expense_analytics_<period-id>.xlsx` через `openpyxl`, без Excel COM,
+Microsoft Excel, pandas или web-server. В книге есть листы Summary, Purchases, By Category,
+By Payer, By Participant, Balances, Settlements, Top Purchases, Warnings и Charts.
+
+Денежные значения записываются числовыми ячейками с форматом `#,##0.00`; это позволяет Excel и
+LibreOffice сортировать, суммировать и фильтровать значения без потери отображаемой точности до
+копеек. Табличные листы используют существующие CSV-структуры аналитики, freeze panes и filters.
+На Charts вставляются уже сформированные PNG; при пустом периоде выводится понятное сообщение.
+
 Документ фиксирует решения для аналитических отчетов Expense Splitter.
 
 ## Единая палитра P1.A.0
