@@ -49,9 +49,13 @@
 ### Windows PowerShell, вариант для обычного пользователя
 
 ```powershell
-.\scripts\install.ps1
-.\scripts\run-launcher.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
 ```
+
+Если в текущей сессии PowerShell уже разрешен запуск локальных скриптов, можно использовать короткую форму
+`.\scripts\run-launcher.ps1`. Если появляется ошибка `PSSecurityException` или сообщение, что файл
+`run-launcher.ps1` не имеет цифровой подписи, используйте вариант выше с `-ExecutionPolicy Bypass`.
 
 или после установки:
 
@@ -228,10 +232,10 @@ expense-splitter --help
 ```text
 Installation completed.
 Run launcher:
-.\scripts\run-launcher.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
 
 Run CLI:
-.\scripts\run-cli.ps1 --help
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 --help
 ```
 
 8. Не требовать прав администратора.
@@ -241,7 +245,7 @@ Run CLI:
 Дополнительный параметр:
 
 ```powershell
-.\scripts\install.ps1 -Dev
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Dev
 ```
 
 Устанавливает dev-зависимости:
@@ -263,7 +267,7 @@ pip install -e ".[dev]"
 Пример:
 
 ```powershell
-.\scripts\run-launcher.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
 ```
 
 ---
@@ -275,9 +279,9 @@ pip install -e ".[dev]"
 Пример:
 
 ```powershell
-.\scripts\run-cli.ps1 balances
-.\scripts\run-cli.ps1 settle
-.\scripts\run-cli.ps1 report
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 balances
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 settle
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 report
 ```
 
 ---
@@ -665,8 +669,8 @@ expense-splitter restore path/to/backup.zip
 Основные пользовательские команды:
 
 ```powershell
-.\scripts\install.ps1
-.\scripts\run-launcher.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
 expense-splitter analytics --period month --year 2026 --month 6 --format all
 ```
 
