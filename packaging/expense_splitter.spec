@@ -87,3 +87,31 @@ launcher_exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+gui_analysis = Analysis(
+    [source_path("expense_splitter", "gui", "app.py")],
+    **common_analysis_kwargs,
+)
+gui_pyz = PYZ(gui_analysis.pure, gui_analysis.zipped_data, cipher=block_cipher)
+
+gui_exe = EXE(
+    gui_pyz,
+    gui_analysis.scripts,
+    gui_analysis.binaries,
+    gui_analysis.zipfiles,
+    gui_analysis.datas,
+    [],
+    name="expense-splitter-gui",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=UPX_ENABLED,
+    upx_exclude=[],
+    runtime_info=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)

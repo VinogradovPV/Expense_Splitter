@@ -25,6 +25,7 @@ dev = [
 [project.scripts]
 expense-splitter = "expense_splitter.__main__:main"
 expense-splitter-launcher = "expense_splitter.launcher:main"
+expense-splitter-gui = "expense_splitter.gui.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

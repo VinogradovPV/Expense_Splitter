@@ -1,3 +1,66 @@
+## P2.GUI.1 — Desktop GUI launcher foundation
+
+Дата: 2026-06-19
+Статус: реализовано локально; публикация заблокирована лимитом outside-sandbox approval.
+
+### Цель
+
+Добавить отдельный безконсольный desktop GUI launcher на `tkinter`, не удаляя CLI и текущий
+console launcher.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/gui/` | Добавлен пакет GUI: `app.py`, `actions.py`, `state.py`, `dialogs.py`, `widgets.py` |
+| `pyproject.toml` | Добавлен entry point `expense-splitter-gui = "expense_splitter.gui.app:main"` |
+| `scripts/run-gui.ps1` | Добавлен Windows wrapper для запуска GUI и `-Help` |
+| `packaging/expense_splitter.spec` | Добавлен `expense-splitter-gui` PyInstaller target с `console=False` |
+| `tests/test_gui_smoke.py` | Добавлены smoke tests без запуска реального `mainloop` |
+| `README.md`, `docs/USER_GUIDE.md`, `docs/Troubleshooting.md` | Добавлена документация по GUI launcher и PowerShell execution policy |
+| `scripts/qa/check_text_encoding.py` | GUI prompt v2 добавлен в allow-list строк с примерами mojibake-маркеров |
+| `scripts/build-windows.ps1`, `scripts/build-unix.sh` | Не менялись: оба скрипта уже собирают общий `packaging/expense_splitter.spec`, где добавлен GUI target |
+
+### Функциональность GUI
+
+- Разделы: `Покупки`, `Текущие расчеты`, `Периоды взаиморасчетов`, `Аналитика и отчеты`, `Данные и обслуживание`, `Справка`.
+- Просмотр и добавление покупок.
+- Просмотр балансов и итоговых переводов по open scope.
+- Запуск analytics за month/quarter/year.
+- Открытие папок `data` и `reports`.
+- Просмотр settlement periods.
+- Preview закрытия периода.
+- Кнопка `Закрыть период и обнулить текущие взаиморасчеты` с предупреждением и confirm.
+- Закрытие периода использует существующую `settlement_periods.close` логику и не удаляет покупки.
+
+### Проверки
+
+| Команда / проверка | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` | OK outside sandbox | Entry point `expense-splitter-gui.exe` установлен |
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\gui\app.py src\expense_splitter\gui\actions.py src\expense_splitter\gui\state.py` | OK outside sandbox | Синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_gui_smoke.py -v` | OK outside sandbox | `4 passed` |
+| `.\.venv\Scripts\expense-splitter-gui.exe --help` | OK outside sandbox | Help выводится без запуска GUI event loop |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1 -Help` | OK outside sandbox | Help wrapper-а выводится |
+| Полный pytest | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
+| Compileall | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
+| Encoding | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
+| Ручной GUI smoke | pending | Требует интерактивного визуального окна; будет зафиксирован отдельно |
+
+### Ограничение выполнения
+
+После успешных фокусных проверок повторный запуск полного набора outside-sandbox проверок был
+отклонен автоматическим approval reviewer из-за usage limit с рекомендацией повторить позже.
+Обходные варианты не использовались. Commit, push и GitHub Actions verification на этом проходе
+не выполнялись.
+
+### Git/GitHub
+
+- Commit hash: pending; commit не создан из-за blocked checks.
+- Push: pending; push не выполнялся.
+- GitHub Actions: pending; remote verification не запускался.
+- Generated artifacts: не staged; `git status --short --ignored` показал их только как ignored.
+
 # Expense Splitter Production Ready Progress Report
 
 Дата: 2026-06-18

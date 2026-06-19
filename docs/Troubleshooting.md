@@ -1,5 +1,35 @@
 # Troubleshooting Expense Splitter
 
+## 0. GUI launcher
+
+### 0.1. `run-gui.ps1` does not start because the script is not signed
+
+**Problem:** PowerShell shows `PSSecurityException`, `UnauthorizedAccess`, or says that
+`scripts\run-gui.ps1` does not have a digital signature.
+
+**Solution:** Start the GUI through a one-time process policy bypass:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1
+```
+
+This does not change the system-wide execution policy.
+
+### 0.2. GUI opens, but data is empty
+
+Run initialization from CLI or use the existing installer flow:
+
+```powershell
+expense-splitter init --with-examples
+```
+
+The GUI also creates empty default YAML files when `data/` is missing.
+
+### 0.3. GUI reports an error dialog
+
+User-facing GUI errors are shown through dialogs without traceback. Check YAML files in `data/`
+and the `.bak` copies if a data file was edited manually.
+
 This document provides solutions to common issues you might encounter while using or installing Expense Splitter.
 
 ## 1. Installation Issues
