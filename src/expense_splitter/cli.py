@@ -437,7 +437,9 @@ def analytics_command(
     year: int = typer.Option(..., "--year", help="Analytics year"),
     month: int = typer.Option(None, "--month", help="Month number for month period"),
     quarter: int = typer.Option(None, "--quarter", help="Quarter number for quarter period"),
-    output_format: str = typer.Option("all", "--format", help="Output: markdown, csv, png, all"),
+    output_format: str = typer.Option(
+        "all", "--format", help="Output: markdown, csv, png, html, all"
+    ),
     output_root: Path = typer.Option(
         Path("reports/analytics"), "--output-root", help="Analytics reports root"
     ),

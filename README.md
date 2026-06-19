@@ -734,6 +734,17 @@ expense-splitter analytics --period year --year 2026 --format all
 CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM. Если график не создан из-за отсутствия данных, причина записывается в `tables/warnings.csv`.
 
 Подробнее: `docs/USER_GUIDE.md` и `docs/ANALYTICS.md`.
+
+### Offline HTML-отчёт
+
+Статический HTML без CDN, Plotly и web-server создаётся командой:
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format html
+```
+
+Файл `reports/analytics/<year>/<period-id>/analytics_dashboard.html` содержит summary cards,
+warnings, таблицы, локальные PNG и ссылки на CSV/Markdown. Формат `all` также включает HTML.
 ## Периоды взаиморасчетов
 
 Expense Splitter поддерживает безопасное закрытие плавающего периода взаиморасчетов без удаления покупок. Закрытые покупки остаются в истории, но по умолчанию исключаются из текущих `balances` и `settle`.

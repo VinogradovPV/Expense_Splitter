@@ -85,7 +85,8 @@ CSV записываются в `utf-8-sig`, поэтому обычно кор�
 
 ## HTML и XLSX
 
-HTML dashboard и XLSX-отчет пока не реализованы. Они отложены на P2, чтобы базовый production-ready CLI оставался простым и проверяемым.
+Offline HTML dashboard доступен через `--format html` и входит в `--format all`. Его можно открыть
+двойным кликом или кнопкой GUI `Открыть HTML` после генерации. XLSX-отчёт запланирован на P2.A.2.
 
 ## Generated reports и Git
 

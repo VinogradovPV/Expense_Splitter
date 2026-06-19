@@ -106,12 +106,13 @@ class ExpenseSplitterGui:
         self.analytics_month_var = tk.StringVar(value=str(date.today().month))
         self.analytics_quarter_var = tk.StringVar(value="1")
         self.analytics_format_var = tk.StringVar(value="all")
+        self.last_analytics_report_dir: Path | None = None
         rows = (
             ("Период", self.analytics_period_var, ("month", "quarter", "year")),
             ("Год", self.analytics_year_var, None),
             ("Месяц", self.analytics_month_var, None),
             ("Квартал", self.analytics_quarter_var, ("1", "2", "3", "4")),
-            ("Формат", self.analytics_format_var, ("markdown", "csv", "png", "all")),
+            ("Формат", self.analytics_format_var, ("markdown", "csv", "png", "html", "all")),
         )
         for row, (label, variable, values) in enumerate(rows):
             ttk.Label(form, text=label).grid(row=row, column=0, sticky="w", padx=4, pady=4)
@@ -131,6 +132,9 @@ class ExpenseSplitterGui:
             text="Открыть папку reports",
             command=lambda: self.open_path(self.state.reports_dir),
         ).grid(row=len(rows), column=1, sticky="ew", padx=4, pady=8)
+        ttk.Button(form, text="Открыть HTML", command=self.open_html_report).grid(
+            row=len(rows) + 1, column=0, columnspan=2, sticky="ew", padx=4, pady=4
+        )
 
     def _build_data_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
@@ -451,7 +455,21 @@ class ExpenseSplitterGui:
 
         report_dir = self.run_safely(action, "Аналитический отчет создан")
         if report_dir:
+            self.last_analytics_report_dir = report_dir
             messagebox.showinfo("Отчет создан", f"Папка отчета:\n{report_dir}", parent=self.root)
+
+    def open_html_report(self) -> None:
+        if self.last_analytics_report_dir is None:
+            messagebox.showerror(
+                "HTML не найден",
+                "Сначала создайте отчёт в формате HTML или all.",
+                parent=self.root,
+            )
+            return
+        self.run_safely(
+            lambda: actions.open_html_report(self.last_analytics_report_dir),
+            "HTML-отчёт открыт",
+        )
 
     def open_path(self, path: Path) -> None:
         self.run_safely(lambda: actions.open_folder(path), f"Открыта папка {path}")

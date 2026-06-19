@@ -107,6 +107,45 @@ staging generated reports, caches и timestamped backups.
 Commit, push и GitHub Actions не выполняются до фиксации manual GUI smoke либо явного решения
 пользователя принять автоматический gate без интерактивной проверки.
 
+## P2.A.1 — Static HTML analytics report
+
+Дата: 2026-06-19
+Статус: реализовано локально; quality gate пройден, публикация pending.
+
+### Цель
+
+Добавить автономный `analytics_dashboard.html` без внешних зависимостей и web-server, переиспользуя
+существующие Markdown, metadata, CSV и PNG.
+
+### Изменённые файлы
+
+- `src/expense_splitter/analytics_html.py` — безопасный renderer на стандартной библиотеке.
+- `src/expense_splitter/analytics_reporting.py`, `cli.py` — форматы `html` и обновлённый `all`.
+- `src/expense_splitter/gui/app.py`, `gui/actions.py` — формат HTML и действие `Открыть HTML`.
+- `tests/test_analytics_html.py`, `tests/test_analytics_reporting.py` — HTML/CLI/regression tests.
+- README и аналитическая пользовательская документация.
+
+### Проверки
+
+| Проверка | Результат |
+|---|---|
+| Editable install | OK; warning о deprecated Typer extra `all` |
+| `pytest tests/test_analytics_html.py -v` | `4 passed` |
+| Полный `pytest tests` | `91 passed` |
+| `compileall -q src tests` | OK |
+| Encoding/mojibake check | OK |
+| `ruff check src tests` | OK |
+| CLI month/quarter/year `--format html` | OK |
+| CLI month `--format all` | OK, HTML включён |
+| PNG visual QA | OK; `spending_by_category.png` читаем |
+| HTML browser QA | Ограничение среды: встроенный браузер недоступен; source/offline contracts проверены тестами |
+
+Commit hash, push и GitHub Actions фиксируются после публикации.
+
+### Ограничения
+
+HTML статический: фильтры и интерактивные графики намеренно отсутствуют. XLSX перенесён в P2.A.2.
+
 # Expense Splitter Production Ready Progress Report
 
 Дата: 2026-06-18

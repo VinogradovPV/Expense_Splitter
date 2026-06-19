@@ -1,5 +1,20 @@
 # Аналитика Expense Splitter
 
+## Static HTML
+
+Формат `html` создаёт полностью автономный отчёт `analytics_dashboard.html` с embedded CSS,
+локальными PNG-графиками, таблицами и относительными ссылками на CSV и Markdown. Внешний интернет,
+CDN, Plotly, Jinja2 и web-server не используются.
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format html
+expense-splitter analytics --period quarter --year 2026 --quarter 2 --format html
+expense-splitter analytics --period year --year 2026 --format html
+```
+
+`--format html` и `--format all` создают полный комплект Markdown/metadata/CSV/доступных PNG/HTML.
+Если данных для графика нет, HTML показывает понятное сообщение вместо битого изображения.
+
 Документ фиксирует решения для аналитических отчетов Expense Splitter.
 
 ## Единая палитра P1.A.0

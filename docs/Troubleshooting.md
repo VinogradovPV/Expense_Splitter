@@ -161,6 +161,13 @@ reset-test не очищает.
 Файлы `*.bak`, `.pytest_cache/`, `.ruff_cache/`, `dist/`, `build/`, `reports/` и `*.egg-info/`
 являются generated artifacts и не должны добавляться в Git.
 
+### 5.6. HTML не открывается или график отсутствует
+
+Сначала создайте отчёт с `--format html` либо `--format all`. Открывайте
+`analytics_dashboard.html` вместе с соседними папками `tables/` и `charts/`: ссылки относительные.
+Отсутствующий PNG при пустом периоде не является ошибкой — HTML показывает сообщение об отсутствии
+данных. Отчёт не выполняет сетевых запросов и работает offline.
+
 If you encounter an issue not covered here, or if the solutions provided do not resolve your problem, please:
 
 1.  **Check the GitHub Issues**: Someone else might have already reported a similar issue.

@@ -9,9 +9,10 @@ from typing import Iterable, Sequence
 
 from expense_splitter.analytics import AnalyticsDataset
 from expense_splitter.analytics_charts import generate_analytics_charts
+from expense_splitter.analytics_html import write_html_report
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
-SUPPORTED_FORMATS = {"markdown", "csv", "png", "all"}
+SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "all"}
 CSV_ENCODING = "utf-8-sig"
 
 
@@ -23,29 +24,41 @@ def generate_analytics_report(
     """Generate requested analytics artifacts and return the period report directory."""
     format_key = output_format.lower()
     if format_key not in SUPPORTED_FORMATS:
-        raise ValueError("Format must be one of: markdown, csv, png, all.")
+        raise ValueError("Format must be one of: markdown, csv, png, html, all.")
 
     report_dir = output_root / str(dataset.period_spec.year) / dataset.period_spec.period_id
     report_dir.mkdir(parents=True, exist_ok=True)
     warnings = [dict(row) for row in dataset.warnings]
     generated: list[Path] = []
 
-    if format_key in {"png", "all"}:
+    bundle_format = format_key in {"html", "all"}
+    if format_key == "html":
+        for stale_dir in (report_dir / "tables", report_dir / "charts"):
+            stale_dir.mkdir(parents=True, exist_ok=True)
+
+    if format_key in {"png", "html", "all"}:
         chart_paths, chart_warnings = generate_analytics_charts(dataset, report_dir / "charts")
         generated.extend(chart_paths)
         warnings.extend(chart_warnings)
 
-    if format_key in {"csv", "all"}:
+    if format_key in {"csv", "html", "all"}:
         generated.extend(write_csv_tables(dataset, report_dir / "tables", warnings))
     elif format_key == "png" and warnings:
         generated.append(write_warnings_csv(report_dir / "tables" / "warnings.csv", warnings))
 
-    if format_key in {"markdown", "all"}:
+    if format_key in {"markdown", "html", "all"}:
         generated.append(
             write_markdown_report(dataset, report_dir / "analytics_report.md", warnings)
         )
 
-    if format_key == "all":
+    if bundle_format:
+        generated.append(
+            write_html_report(
+                dataset,
+                report_dir / "analytics_dashboard.html",
+                warnings,
+            )
+        )
         metadata_path = report_dir / "metadata.json"
         generated.append(metadata_path)
         write_metadata(dataset, metadata_path, generated, warnings, report_dir)

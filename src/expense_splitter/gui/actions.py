@@ -241,3 +241,15 @@ def open_folder(path: Path) -> None:
         subprocess.Popen(["open", str(path)])
     else:
         subprocess.Popen(["xdg-open", str(path)])
+
+
+def open_html_report(report_dir: Path) -> None:
+    html_path = report_dir / "analytics_dashboard.html"
+    if not html_path.is_file():
+        raise FileNotFoundError("HTML-отчёт не создан. Сначала выберите формат HTML или all.")
+    if platform.system() == "Windows":
+        os.startfile(html_path)  # type: ignore[attr-defined]
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", str(html_path)])
+    else:
+        subprocess.Popen(["xdg-open", str(html_path)])
