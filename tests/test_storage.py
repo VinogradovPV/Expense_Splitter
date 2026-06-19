@@ -6,6 +6,7 @@ import yaml
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
 from expense_splitter.models import Group, Participant, Purchase
 from expense_splitter.storage import (
+    StorageError,
     initialize_data_files,
     load_groups,
     load_participants,
@@ -13,7 +14,6 @@ from expense_splitter.storage import (
     save_groups,
     save_participants,
     save_purchases,
-    StorageError,
 )
 
 
@@ -24,9 +24,11 @@ def test_initialize_data_files_keeps_participants_and_groups(tmp_path):
 
     participants_path = data_dir / "participants.yaml"
     purchases_path = data_dir / "purchases.yaml"
+    settlement_periods_path = data_dir / "settlement_periods.yaml"
 
     assert participants_path.exists()
     assert purchases_path.exists()
+    assert settlement_periods_path.exists()
 
     participants = load_participants(participants_path)
     groups = load_groups(participants_path)
@@ -38,8 +40,12 @@ def test_initialize_data_files_keeps_participants_and_groups(tmp_path):
 
     raw_participants = yaml.safe_load(participants_path.read_text(encoding="utf-8"))
     raw_purchases = yaml.safe_load(purchases_path.read_text(encoding="utf-8"))
+    raw_settlement_periods = yaml.safe_load(
+        settlement_periods_path.read_text(encoding="utf-8")
+    )
     assert set(raw_participants) == {"participants", "groups"}
-    assert raw_purchases == {"purchases": []}
+    assert raw_purchases == {"schema_version": 1, "purchases": []}
+    assert raw_settlement_periods == {"schema_version": 1, "settlement_periods": []}
 
 
 def test_save_participants_preserves_existing_groups(tmp_path):

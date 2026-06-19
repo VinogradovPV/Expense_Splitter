@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -24,6 +24,8 @@ class Purchase:
     purchase_name: str = DEFAULT_PURCHASE_NAME
     category: Optional[str] = None
     comment: Optional[str] = None
+    settled: bool = False
+    settlement_period_id: Optional[str] = None
 
     @property
     def title(self) -> str:
@@ -63,3 +65,29 @@ class Settlement:
             raise TypeError("Settlement amount must be a Decimal type.")
         if self.amount <= 0:
             raise ValueError("Settlement amount must be greater than zero.")
+
+
+@dataclass
+class SettlementPeriod:
+    id: str
+    name: str
+    status: str
+    date_from: date
+    date_to: date
+    closed_at: datetime
+    purchase_ids: List[str]
+    total_amount: Decimal
+    settlements: List[Settlement] = field(default_factory=list)
+    created_by: str = "cli"
+    notes: Optional[str] = None
+    reopened_at: Optional[datetime] = None
+
+    def __post_init__(self):
+        if self.status not in {"closed", "reopened"}:
+            raise ValueError("Settlement period status must be 'closed' or 'reopened'.")
+        if self.date_from > self.date_to:
+            raise ValueError("Settlement period start date must not be after end date.")
+        if not isinstance(self.total_amount, Decimal):
+            raise TypeError("Settlement period total amount must be a Decimal type.")
+        if self.total_amount < 0:
+            raise ValueError("Settlement period total amount must not be negative.")

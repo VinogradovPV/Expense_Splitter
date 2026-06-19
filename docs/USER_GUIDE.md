@@ -102,3 +102,33 @@ Remove-Item -Recurse -Force reports\analytics
 ```
 
 Эта команда удаляет только сгенерированные аналитические отчеты, но не YAML-данные приложения.
+## Периоды взаиморасчетов
+
+Период взаиморасчетов закрывает выбранные открытые покупки за диапазон дат и сохраняет snapshot переводов. Покупки не удаляются: они остаются в истории и получают `settled: true` и `settlement_period_id`.
+
+Предварительный просмотр:
+
+```powershell
+expense-splitter settlement-period preview --from 2026-06-01 --to 2026-06-19
+```
+
+Закрытие периода:
+
+```powershell
+expense-splitter settlement-period close --from 2026-06-01 --to 2026-06-19 --name "Июнь до 19.06" --confirm CLOSE_PERIOD
+```
+
+Просмотр истории:
+
+```powershell
+expense-splitter settlement-period list
+expense-splitter settlement-period show settlement_2026_06_19_001
+```
+
+Повторное открытие периода:
+
+```powershell
+expense-splitter settlement-period reopen settlement_2026_06_19_001 --confirm REOPEN_PERIOD
+```
+
+`balances` и `settle` по умолчанию считают только открытые покупки. Для всей истории используйте `--scope all`, для конкретного закрытого периода - `--settlement-period <id>`.

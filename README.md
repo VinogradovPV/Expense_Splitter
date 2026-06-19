@@ -709,3 +709,25 @@ expense-splitter analytics --period year --year 2026 --format all
 CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM. Если график не создан из-за отсутствия данных, причина записывается в `tables/warnings.csv`.
 
 Подробнее: `docs/USER_GUIDE.md` и `docs/ANALYTICS.md`.
+## Периоды взаиморасчетов
+
+Expense Splitter поддерживает безопасное закрытие плавающего периода взаиморасчетов без удаления покупок. Закрытые покупки остаются в истории, но по умолчанию исключаются из текущих `balances` и `settle`.
+
+```powershell
+expense-splitter settlement-period preview --from 2026-06-01 --to 2026-06-19
+expense-splitter settlement-period close --from 2026-06-01 --to 2026-06-19 --name "Июнь до 19.06" --confirm CLOSE_PERIOD
+expense-splitter settlement-period list
+expense-splitter settlement-period show settlement_2026_06_19_001
+expense-splitter settlement-period reopen settlement_2026_06_19_001 --confirm REOPEN_PERIOD
+```
+
+Текущий расчет считает только открытые покупки:
+
+```powershell
+expense-splitter balances --scope open
+expense-splitter settle --scope open
+```
+
+Полный расчет по всей истории доступен через `--scope all`, а snapshot закрытого периода через `--settlement-period`.
+
+Подробнее: `docs/SETTLEMENT_PERIODS.md`.

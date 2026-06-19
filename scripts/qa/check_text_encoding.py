@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TEXT_SUFFIXES = {
@@ -55,6 +54,7 @@ MOJIBAKE_MARKERS = tuple(
 ) + ("\u00d0", "\u00d1", "\u2568", "\u2564", "\ufffd")
 
 ALLOWED_MARKER_FILES = {
+    Path("docs/prompts/expense_splitter_p2_system_prompt_v1.md"),
     Path("docs/prompts/expense_splitter_prod_ready_step_by_step_v5_ru.md"),
     Path("docs/prompts/expense_splitter_prod_ready_system_prompt_v5.md"),
     Path("scripts/qa/check_text_encoding.py"),

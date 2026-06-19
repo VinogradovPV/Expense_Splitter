@@ -613,3 +613,44 @@ Generated `reports/analytics/` добавлен в `.gitignore` и не долж
 ### Ограничения
 
 HTML dashboard и XLSX report остаются P2. Generated reports в `reports/analytics/` не коммитятся.
+## P2.S.1 — Settlement periods foundation
+
+Дата: 2026-06-19
+Статус: в работе; локальная реализация и проверки выполняются.
+
+### Цель
+
+Добавить безопасное закрытие плавающего периода взаиморасчетов без удаления покупок и без переписывания истории.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/models.py` | Добавлены поля `settled`, `settlement_period_id` у `Purchase` и модель `SettlementPeriod` |
+| `src/expense_splitter/storage.py` | Добавлены load/save для `settlement_periods.yaml`, schema_version, backward compatibility старых покупок, init нового YAML |
+| `src/expense_splitter/settlement_periods.py` | Добавлена доменная логика preview/close/list/show/reopen и scope-фильтрация |
+| `src/expense_splitter/cli.py` | Добавлены команды `settlement-period preview/close/list/show/reopen`; `balances` и `settle` получили `--scope` и `--settlement-period` |
+| `src/expense_splitter/reporting.py` | Markdown-отчет показывает settlement status покупки |
+| `data/settlement_periods.yaml` | Добавлен пустой пользовательский YAML-файл периодов |
+| `tests/test_settlement_periods.py` | Добавлены тесты legacy compatibility, preview без мутации, close без удаления, scope, storage round-trip, reopen и CLI |
+| `docs/SETTLEMENT_PERIODS.md`, `README.md`, `docs/USER_GUIDE.md` | Добавлена документация по периодам взаиморасчетов |
+| `scripts/qa/check_text_encoding.py` | P2 prompt добавлен в allow-list строк с примерами mojibake-маркеров |
+
+### Проверки
+
+| Команда / проверка | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m py_compile src\expense_splitter\settlement_periods.py src\expense_splitter\storage.py src\expense_splitter\cli.py` | OK outside sandbox | Синтаксис корректен |
+| `.\.venv\Scripts\python.exe -m pytest tests\test_settlement_periods.py -v` | OK outside sandbox | `7 passed` |
+| Полный pytest | OK outside sandbox | `72 passed in 1.78s` |
+| Compileall | OK outside sandbox | `python -m compileall -q src tests` |
+| Encoding | OK outside sandbox | UTF-8 files have no mojibake markers |
+| CLI smoke | OK outside sandbox | Изолированная директория `.tmp\p2_s1_smoke\data`; close не менял реальные пользовательские YAML |
+| Ruff по затронутым файлам | OK outside sandbox | `All checks passed!` |
+
+### Git/GitHub
+
+- Commit hash: текущий `HEAD` после commit `feat: add settlement periods`; точный hash зафиксирован в финальном ответе этапа.
+- Push: pending.
+- GitHub Actions: pending.
+- Generated artifacts: не должны попадать в staging.

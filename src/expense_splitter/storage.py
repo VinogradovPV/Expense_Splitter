@@ -1,13 +1,21 @@
 import os
 import shutil
 import tempfile
-import yaml
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import List, TypeVar
-from decimal import Decimal
-from datetime import date, datetime
 
-from expense_splitter.models import DEFAULT_PURCHASE_NAME, Participant, Group, Purchase
+import yaml
+
+from expense_splitter.models import (
+    DEFAULT_PURCHASE_NAME,
+    Group,
+    Participant,
+    Purchase,
+    Settlement,
+    SettlementPeriod,
+)
 
 T = TypeVar("T")
 
@@ -45,6 +53,9 @@ yaml.add_representer(Decimal, DecimalYamlRepresenter.to_yaml)
 yaml.add_constructor(u'!decimal', DecimalYamlRepresenter.from_yaml)
 yaml.add_representer(date, DateYamlRepresenter.to_yaml)
 yaml.add_constructor(u'!date', DateYamlRepresenter.from_yaml)
+
+
+SCHEMA_VERSION = 1
 
 
 def _load_yaml_data(file_path: Path) -> dict:
@@ -126,11 +137,14 @@ def load_purchases(file_path: Path) -> List[Purchase]:
         if not p_dict.get('purchase_name'):
             p_dict['purchase_name'] = p_dict.get('title') or DEFAULT_PURCHASE_NAME
         p_dict.pop('title', None)
+        p_dict['settled'] = bool(p_dict.get('settled', False))
+        if not p_dict.get('settlement_period_id'):
+            p_dict['settlement_period_id'] = None
         purchases.append(Purchase(**p_dict))
     return purchases
 
 def save_purchases(file_path: Path, purchases: List[Purchase]):
-    data = {'purchases': []}
+    data = {'schema_version': SCHEMA_VERSION, 'purchases': []}
     for p in purchases:
         p_dict = {
             'id': p.id,
@@ -141,6 +155,8 @@ def save_purchases(file_path: Path, purchases: List[Purchase]):
             'participants': p.participants,
             'category': p.category,
             'comment': p.comment,
+            'settled': p.settled,
+            'settlement_period_id': p.settlement_period_id,
         }
         # Convert Decimal to string for YAML serialization if not handled by representer
         if isinstance(p_dict.get('amount'), Decimal):
@@ -151,13 +167,102 @@ def save_purchases(file_path: Path, purchases: List[Purchase]):
     _save_yaml_data(file_path, data)
 
 
+def _parse_period_datetime(value) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value))
+
+
+def _parse_period_date(value) -> date:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    return date.fromisoformat(str(value))
+
+
+def _load_settlement(settlement_data: dict) -> Settlement:
+    return Settlement(
+        from_participant=settlement_data.get('from') or settlement_data.get('from_participant'),
+        to_participant=settlement_data.get('to') or settlement_data.get('to_participant'),
+        amount=Decimal(str(settlement_data['amount'])),
+    )
+
+
+def load_settlement_periods(file_path: Path) -> List[SettlementPeriod]:
+    data = _load_yaml_data(file_path)
+    periods = []
+    for period_data in data.get('settlement_periods', []):
+        p_dict = dict(period_data)
+        settlements = [_load_settlement(item) for item in p_dict.get('settlements', [])]
+        periods.append(
+            SettlementPeriod(
+                id=p_dict['id'],
+                name=p_dict['name'],
+                status=p_dict.get('status', 'closed'),
+                date_from=_parse_period_date(p_dict.get('date_from')),
+                date_to=_parse_period_date(p_dict.get('date_to')),
+                closed_at=_parse_period_datetime(p_dict.get('closed_at')),
+                purchase_ids=list(p_dict.get('purchase_ids', [])),
+                total_amount=Decimal(str(p_dict.get('total_amount', '0.00'))),
+                settlements=settlements,
+                created_by=p_dict.get('created_by', 'cli'),
+                notes=p_dict.get('notes'),
+                reopened_at=(
+                    _parse_period_datetime(p_dict['reopened_at'])
+                    if p_dict.get('reopened_at')
+                    else None
+                ),
+            )
+        )
+    return periods
+
+
+def save_settlement_periods(file_path: Path, periods: List[SettlementPeriod]):
+    data = {'schema_version': SCHEMA_VERSION, 'settlement_periods': []}
+    for period in periods:
+        data['settlement_periods'].append(
+            {
+                'id': period.id,
+                'name': period.name,
+                'status': period.status,
+                'date_from': period.date_from.isoformat(),
+                'date_to': period.date_to.isoformat(),
+                'closed_at': period.closed_at.isoformat(timespec='seconds'),
+                'purchase_ids': list(period.purchase_ids),
+                'total_amount': str(period.total_amount),
+                'settlements': [
+                    {
+                        'from': settlement.from_participant,
+                        'to': settlement.to_participant,
+                        'amount': str(settlement.amount),
+                    }
+                    for settlement in period.settlements
+                ],
+                'created_by': period.created_by,
+                'notes': period.notes,
+                'reopened_at': (
+                    period.reopened_at.isoformat(timespec='seconds')
+                    if period.reopened_at
+                    else None
+                ),
+            }
+        )
+    _save_yaml_data(file_path, data)
+
+
 def initialize_data_files(data_dir: Path, participants: List[Participant], groups: List[Group]):
     participants_path = data_dir / 'participants.yaml'
     purchases_path = data_dir / 'purchases.yaml'
+    settlement_periods_path = data_dir / 'settlement_periods.yaml'
 
     if not participants_path.exists():
         save_participants(participants_path, participants)
         save_groups(participants_path, groups) # Save groups to the same file as participants
 
     if not purchases_path.exists():
-        _save_yaml_data(purchases_path, {'purchases': []})
+        _save_yaml_data(purchases_path, {'schema_version': SCHEMA_VERSION, 'purchases': []})
+
+    if not settlement_periods_path.exists():
+        _save_yaml_data(
+            settlement_periods_path,
+            {'schema_version': SCHEMA_VERSION, 'settlement_periods': []},
+        )

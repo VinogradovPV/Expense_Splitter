@@ -14,20 +14,33 @@ from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS, EXAM
 from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
 from expense_splitter.reporting import generate_markdown_report
 from expense_splitter.settlement import calculate_settlements
+from expense_splitter.settlement_periods import (
+    close_settlement_period,
+    filter_purchases_by_settlement_scope,
+    get_settlement_period,
+    parse_period_date,
+    preview_settlement_period,
+    reopen_settlement_period,
+)
 from expense_splitter.storage import (
     StorageError,
     initialize_data_files,
     load_groups,
     load_participants,
     load_purchases,
+    load_settlement_periods,
     save_purchases,
+    save_settlement_periods,
 )
 
 app = typer.Typer(help="Expense Splitter CLI")
+settlement_period_app = typer.Typer(help="Settlement period commands")
+app.add_typer(settlement_period_app, name="settlement-period")
 console = Console()
 
 # Default data directory
 DATA_DIR = Path("data")
+SETTLEMENT_PERIODS_FILE = "settlement_periods.yaml"
 
 
 def get_data_dir() -> Path:
@@ -37,6 +50,28 @@ def get_data_dir() -> Path:
 def handle_storage_error(error: StorageError):
     typer.echo(f"Data error in {error.file_path}: {error}")
     raise typer.Exit(1)
+
+
+def get_participant_names(data_dir: Path) -> list[str]:
+    participants = load_participants(data_dir / "participants.yaml")
+    all_names = [p.name for p in participants]
+    return all_names or [p.name for p in DEFAULT_PARTICIPANTS]
+
+
+def select_purchases_for_calculation(
+    purchases: list[Purchase],
+    scope: str,
+    settlement_period_id: str | None,
+) -> list[Purchase]:
+    try:
+        return filter_purchases_by_settlement_scope(
+            purchases,
+            scope=scope,  # type: ignore[arg-type]
+            settlement_period_id=settlement_period_id,
+        )
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
 
 
 @app.command()
@@ -162,21 +197,22 @@ def list_purchases(data_dir: Path = typer.Option(DATA_DIR, help="Data directory"
 
 
 @app.command()
-def balances(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
+def balances(
+    scope: str = typer.Option("open", "--scope", help="Calculation scope: open or all"),
+    settlement_period_id: str = typer.Option(
+        None, "--settlement-period", help="Calculate only one closed settlement period"
+    ),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
     """Show current balances for all participants."""
     try:
-        participants = load_participants(data_dir / "participants.yaml")
+        all_names = get_participant_names(data_dir)
         purchases = load_purchases(data_dir / "purchases.yaml")
     except StorageError as error:
         handle_storage_error(error)
 
-    all_names = [p.name for p in participants]
-
-    # Handle the case where participants list might be empty or missing from YAML properly in tests
-    if not all_names:
-        all_names = [p.name for p in DEFAULT_PARTICIPANTS]
-
-    bals = calculate_balances(purchases, all_names)
+    selected_purchases = select_purchases_for_calculation(purchases, scope, settlement_period_id)
+    bals = calculate_balances(selected_purchases, all_names)
 
     table = Table("Participant", "Paid", "Share", "Net Balance")
     for b in sorted(bals, key=lambda x: x.participant):
@@ -188,20 +224,22 @@ def balances(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
 
 
 @app.command()
-def settle(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
+def settle(
+    scope: str = typer.Option("open", "--scope", help="Calculation scope: open or all"),
+    settlement_period_id: str = typer.Option(
+        None, "--settlement-period", help="Calculate only one closed settlement period"
+    ),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
     """Show minimum transfers required to settle all debts."""
     try:
-        participants = load_participants(data_dir / "participants.yaml")
+        all_names = get_participant_names(data_dir)
         purchases = load_purchases(data_dir / "purchases.yaml")
     except StorageError as error:
         handle_storage_error(error)
 
-    all_names = [p.name for p in participants]
-
-    if not all_names:
-        all_names = [p.name for p in DEFAULT_PARTICIPANTS]
-
-    bals = calculate_balances(purchases, all_names)
+    selected_purchases = select_purchases_for_calculation(purchases, scope, settlement_period_id)
+    bals = calculate_balances(selected_purchases, all_names)
     settlements = calculate_settlements(bals)
 
     if not settlements:
@@ -212,6 +250,161 @@ def settle(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
     for s in settlements:
         table.add_row(s.from_participant, s.to_participant, f"{s.amount:.2f}")
     console.print(table)
+
+
+@settlement_period_app.command("preview")
+def settlement_period_preview(
+    from_date: str = typer.Option(..., "--from", help="Start date in YYYY-MM-DD format"),
+    to_date: str = typer.Option(..., "--to", help="End date in YYYY-MM-DD format"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Preview settlement period close without changing data."""
+    try:
+        date_from = parse_period_date(from_date)
+        date_to = parse_period_date(to_date)
+        all_names = get_participant_names(data_dir)
+        purchases = load_purchases(data_dir / "purchases.yaml")
+        preview = preview_settlement_period(purchases, all_names, date_from, date_to)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(
+        f"[bold]Preview:[/bold] {preview.date_from.isoformat()}..{preview.date_to.isoformat()}"
+    )
+    console.print(f"Purchases: {preview.purchase_count}")
+    console.print(f"Total amount: {preview.total_amount:.2f}")
+    if not preview.settlements:
+        console.print("[green]All selected purchases are already balanced.[/green]")
+        return
+
+    table = Table("From", "To", "Amount")
+    for item in preview.settlements:
+        table.add_row(item.from_participant, item.to_participant, f"{item.amount:.2f}")
+    console.print(table)
+
+
+@settlement_period_app.command("close")
+def settlement_period_close(
+    from_date: str = typer.Option(..., "--from", help="Start date in YYYY-MM-DD format"),
+    to_date: str = typer.Option(..., "--to", help="End date in YYYY-MM-DD format"),
+    name: str = typer.Option(..., "--name", help="Settlement period name"),
+    confirm: str = typer.Option("", "--confirm", help="Must be CLOSE_PERIOD"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Close open purchases in a date range without deleting them."""
+    if confirm != "CLOSE_PERIOD":
+        console.print("[red]Close aborted: pass --confirm CLOSE_PERIOD.[/red]")
+        raise typer.Exit(2)
+    try:
+        date_from = parse_period_date(from_date)
+        date_to = parse_period_date(to_date)
+        all_names = get_participant_names(data_dir)
+        purchases_path = data_dir / "purchases.yaml"
+        periods_path = data_dir / SETTLEMENT_PERIODS_FILE
+        purchases = load_purchases(purchases_path)
+        periods = load_settlement_periods(periods_path)
+        period = close_settlement_period(purchases, periods, all_names, date_from, date_to, name)
+        save_purchases(purchases_path, purchases)
+        save_settlement_periods(periods_path, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(
+        f"[green]Closed settlement period {period.id}: "
+        f"{len(period.purchase_ids)} purchases, {period.total_amount:.2f}.[/green]"
+    )
+
+
+@settlement_period_app.command("list")
+def settlement_period_list(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
+    """List settlement periods."""
+    try:
+        periods = load_settlement_periods(data_dir / SETTLEMENT_PERIODS_FILE)
+    except StorageError as error:
+        handle_storage_error(error)
+
+    if not periods:
+        console.print("No settlement periods recorded.")
+        return
+
+    table = Table("ID", "Name", "Status", "From", "To", "Purchases", "Total")
+    for period in sorted(periods, key=lambda item: (item.date_to, item.id), reverse=True):
+        table.add_row(
+            period.id,
+            period.name,
+            period.status,
+            period.date_from.isoformat(),
+            period.date_to.isoformat(),
+            str(len(period.purchase_ids)),
+            f"{period.total_amount:.2f}",
+        )
+    console.print(table)
+
+
+@settlement_period_app.command("show")
+def settlement_period_show(
+    settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Show settlement period details and snapshot settlements."""
+    try:
+        periods = load_settlement_periods(data_dir / SETTLEMENT_PERIODS_FILE)
+        period = get_settlement_period(periods, settlement_period_id)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(f"[bold]{period.id}[/bold] - {period.name}")
+    console.print(f"Status: {period.status}")
+    console.print(f"Dates: {period.date_from.isoformat()}..{period.date_to.isoformat()}")
+    console.print(f"Purchases: {len(period.purchase_ids)}")
+    console.print(f"Total amount: {period.total_amount:.2f}")
+    if period.reopened_at:
+        console.print(f"Reopened at: {period.reopened_at.isoformat(timespec='seconds')}")
+
+    if not period.settlements:
+        console.print("[green]No transfers required.[/green]")
+        return
+
+    table = Table("From", "To", "Amount")
+    for item in period.settlements:
+        table.add_row(item.from_participant, item.to_participant, f"{item.amount:.2f}")
+    console.print(table)
+
+
+@settlement_period_app.command("reopen")
+def settlement_period_reopen(
+    settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
+    confirm: str = typer.Option("", "--confirm", help="Must be REOPEN_PERIOD"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Reopen a closed settlement period and return its purchases to open scope."""
+    if confirm != "REOPEN_PERIOD":
+        console.print("[red]Reopen aborted: pass --confirm REOPEN_PERIOD.[/red]")
+        raise typer.Exit(2)
+    try:
+        purchases_path = data_dir / "purchases.yaml"
+        periods_path = data_dir / SETTLEMENT_PERIODS_FILE
+        purchases = load_purchases(purchases_path)
+        periods = load_settlement_periods(periods_path)
+        period = reopen_settlement_period(purchases, periods, settlement_period_id)
+        save_purchases(purchases_path, purchases)
+        save_settlement_periods(periods_path, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Reopened settlement period {period.id}.[/green]")
 
 
 @app.command()
