@@ -4,7 +4,6 @@ from decimal import Decimal, InvalidOperation
 from itertools import cycle
 from typing import Sequence
 
-
 PALETTE_NAME = "expense_splitter_default"
 PALETTE_VERSION = 1
 

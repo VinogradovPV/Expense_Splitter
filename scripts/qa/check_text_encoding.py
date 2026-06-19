@@ -54,6 +54,10 @@ MOJIBAKE_MARKERS = tuple(
 ) + ("\u00d0", "\u00d1", "\u2568", "\u2564", "\ufffd")
 
 ALLOWED_MARKER_FILES = {
+    Path("docs/prompts/expense_splitter_p2_gui_system_prompt_v2.md"),
+    Path("docs/prompts/expense_splitter_p2_gui_step_by_step_v2_ru.md"),
+    Path("docs/prompts/expense_splitter_p2_gui_system_prompt_v3.md"),
+    Path("docs/prompts/expense_splitter_p2_gui_step_by_step_v3_ru.md"),
     Path("docs/prompts/expense_splitter_p2_system_prompt_v1.md"),
     Path("docs/prompts/expense_splitter_prod_ready_step_by_step_v5_ru.md"),
     Path("docs/prompts/expense_splitter_prod_ready_system_prompt_v5.md"),

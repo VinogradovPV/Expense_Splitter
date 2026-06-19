@@ -1,7 +1,8 @@
-import pytest
 from decimal import Decimal
+
 from expense_splitter.models import Balance
 from expense_splitter.settlement import calculate_settlements
+
 
 def test_settlements_simple_case():
     balances = [
@@ -37,13 +38,13 @@ def test_settlements_complex_case():
     ]
     settlements = calculate_settlements(balances)
     assert len(settlements) == 3 # C->A (100), D->A (50), D->B (50) - one possible optimal outcome
-    
+
     # Verify total amounts paid and received
     paid_by_c = sum(s.amount for s in settlements if s.from_participant == "C")
     paid_by_d = sum(s.amount for s in settlements if s.from_participant == "D")
     received_by_a = sum(s.amount for s in settlements if s.to_participant == "A")
     received_by_b = sum(s.amount for s in settlements if s.to_participant == "B")
-    
+
     assert paid_by_c == Decimal("100")
     assert paid_by_d == Decimal("100")
     assert received_by_a == Decimal("150")

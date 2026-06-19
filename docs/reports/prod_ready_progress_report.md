@@ -1,7 +1,7 @@
 ## P2.GUI.1 — Desktop GUI launcher foundation
 
 Дата: 2026-06-19
-Статус: реализовано локально; публикация заблокирована лимитом outside-sandbox approval.
+Статус: завершено и опубликовано (`8e05a0b`).
 
 ### Цель
 
@@ -42,24 +42,70 @@ console launcher.
 | `.\.venv\Scripts\python.exe -m pytest tests\test_gui_smoke.py -v` | OK outside sandbox | `4 passed` |
 | `.\.venv\Scripts\expense-splitter-gui.exe --help` | OK outside sandbox | Help выводится без запуска GUI event loop |
 | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1 -Help` | OK outside sandbox | Help wrapper-а выводится |
-| Полный pytest | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
-| Compileall | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
-| Encoding | blocked | Outside-sandbox approval отклонен из-за usage limit; повтор возможен после восстановления лимита или вручную пользователем |
+| Полный pytest | OK, подтверждено пользователем | Проверки P2.GUI.1 завершены перед публикацией |
+| Compileall | OK, подтверждено пользователем | Проверка завершена перед публикацией |
+| Encoding | OK, подтверждено пользователем | Проверка завершена перед публикацией |
 | Ручной GUI smoke | pending | Требует интерактивного визуального окна; будет зафиксирован отдельно |
 
-### Ограничение выполнения
+### Публикация
 
-После успешных фокусных проверок повторный запуск полного набора outside-sandbox проверок был
-отклонен автоматическим approval reviewer из-за usage limit с рекомендацией повторить позже.
-Обходные варианты не использовались. Commit, push и GitHub Actions verification на этом проходе
-не выполнялись.
+Первоначальное ограничение outside-sandbox было снято после самостоятельного запуска проверок
+пользователем. P2.GUI.1 опубликован отдельным commit до начала P2.GUI.2.
 
 ### Git/GitHub
 
-- Commit hash: pending; commit не создан из-за blocked checks.
-- Push: pending; push не выполнялся.
-- GitHub Actions: pending; remote verification не запускался.
+- Commit hash: `8e05a0b`.
+- Push: выполнен пользователем в `origin/prod-ready/p0-p1`.
+- GitHub Actions: проверяется отдельно после публикации P2.GUI.2.
 - Generated artifacts: не staged; `git status --short --ignored` показал их только как ignored.
+
+## P2.GUI.2 — UX desktop GUI
+
+Дата: 2026-06-19
+Статус: реализовано локально; автоматический quality gate пройден, manual GUI smoke и публикация
+pending.
+
+Добавлены редактирование открытых покупок, колонка категории, checklist/multi-select участников и
+категорий, editable ComboBox, persistent `categories.yaml` и безопасный reset-test с typed confirm
+`RESET_TEST_DATA`. Reset создает backup и очищает только покупки и settlement periods, сохраняя
+participants/groups/categories.
+
+### Реализовано
+
+- Persistent `data/categories.yaml` и default categories.
+- Editable ComboBox и checklist/multi-select категорий; новые значения сохраняются только после
+  подтверждения.
+- Колонка `Категория` в таблице покупок и fallback `Без категории`.
+- Редактирование покупки с текущими значениями и блокировкой закрытых записей.
+- Checklist участников с `Выбрать все`, `Снять все`, `Применить`, `Отмена` и сохранением ручного
+  ввода через запятую.
+- Reset-test с предупреждением и typed confirm `RESET_TEST_DATA`; backups обоих YAML создаются до
+  очистки, participants/groups/categories сохраняются.
+
+### Документация
+
+Обновлены `README.md`, `docs/USER_GUIDE.md`, `docs/Troubleshooting.md`, `docs/DATA_SCHEMA.md` и
+`docs/SETTLEMENT_PERIODS.md`. Зафиксировано отличие reset-test от закрытия периода и запрет на
+staging generated reports, caches и timestamped backups.
+
+### Quality gate P2.GUI.2.8
+
+| Проверка | Результат |
+|---|---|
+| `python -m pip install -e ".[dev]"` | OK; warning: Typer 0.26.7 не предоставляет extra `all` |
+| `py_compile` GUI/actions/dialogs/storage/models | OK |
+| Фокусный pytest categories/GUI | `15 passed` |
+| Полный `pytest tests -v` | `87 passed` |
+| `compileall -q src tests` | OK |
+| `scripts/qa/check_text_encoding.py` | OK; UTF-8, mojibake markers не найдены |
+| `ruff check src tests` | OK |
+| `expense-splitter-gui.exe --help` | OK; event loop не запущен |
+| `scripts/run-gui.ps1 -Help` | OK |
+| Isolated GUI startup smoke | OK; реальный tkinter-процесс оставался жив после запуска с `.tmp/p2_gui_2_manual/data` |
+| Полный manual GUI smoke | pending; API-сеанс не может выполнять интерактивные клики в tkinter |
+
+Commit, push и GitHub Actions не выполняются до фиксации manual GUI smoke либо явного решения
+пользователя принять автоматический gate без интерактивной проверки.
 
 # Expense Splitter Production Ready Progress Report
 

@@ -1,6 +1,7 @@
-from decimal import Decimal
 from datetime import date
-from expense_splitter.models import Participant, Group, Purchase
+from decimal import Decimal
+
+from expense_splitter.models import Group, Participant, Purchase
 
 DEFAULT_PARTICIPANTS = [
     Participant(name="Павел"),
@@ -16,7 +17,26 @@ DEFAULT_GROUPS = [
     Group(name="809 кабинет", members=["Павел", "Сергей", "Максим", "Елена"]),
     Group(name="Кофе", members=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Эмилия"]),
     Group(name="Еда", members=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Мария"]),
-    Group(name="На всех", members=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Эмилия", "Мария"]),
+    Group(
+        name="На всех",
+        members=["Павел", "Сергей", "Владимир", "Максим", "Елена", "Эмилия", "Мария"],
+    ),
+]
+
+DEFAULT_CATEGORIES = [
+    "кофе",
+    "еда",
+    "безалкогольные напитки",
+    "алкоголь",
+    "техника",
+    "аксессуары",
+    "продукты",
+    "хозтовары",
+    "аптека и здоровье",
+    "развлечения",
+    "подарки",
+    "прочее",
+    "без категории",
 ]
 
 # Example purchases for testing purposes

@@ -34,9 +34,9 @@ def test_launcher_entry_point():
 
 
 def test_launcher_blank_purchase_name_defaults_to_not_available(tmp_path, monkeypatch):
+    import expense_splitter.launcher as launcher
     from expense_splitter.models import Participant
     from expense_splitter.storage import load_purchases, save_participants
-    import expense_splitter.launcher as launcher
 
     data_dir = tmp_path / "data"
     save_participants(data_dir / "participants.yaml", [Participant(name="Alice")])

@@ -4,13 +4,15 @@ import argparse
 import tkinter as tk
 from datetime import date
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from expense_splitter.gui import actions
 from expense_splitter.gui.dialogs import (
     SETTLEMENT_WARNING,
     AddPurchaseDialog,
     ClosePeriodDialog,
+    EditPurchaseDialog,
+    parse_comma_separated,
 )
 from expense_splitter.gui.state import GuiState
 from expense_splitter.gui.widgets import clear_tree, make_tree
@@ -48,9 +50,12 @@ class ExpenseSplitterGui:
         ttk.Button(toolbar, text="Добавить покупку", command=self.add_purchase).pack(
             side="left", padx=6
         )
+        ttk.Button(toolbar, text="Редактировать покупку", command=self.edit_purchase).pack(
+            side="left", padx=6
+        )
         self.purchases_tree = make_tree(
             tab,
-            ("Дата", "Покупка", "Сумма", "Плательщик", "Участники", "Статус"),
+            ("Дата", "Покупка", "Сумма", "Плательщик", "Участники", "Категория", "Статус"),
         )
         self.purchases_tree.pack(fill="both", expand=True, padx=6, pady=6)
 
@@ -125,9 +130,7 @@ class ExpenseSplitterGui:
             form,
             text="Открыть папку reports",
             command=lambda: self.open_path(self.state.reports_dir),
-        ).grid(
-            row=len(rows), column=1, sticky="ew", padx=4, pady=8
-        )
+        ).grid(row=len(rows), column=1, sticky="ew", padx=4, pady=8)
 
     def _build_data_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
@@ -136,9 +139,7 @@ class ExpenseSplitterGui:
             tab,
             text="Открыть папку data",
             command=lambda: self.open_path(self.state.data_dir),
-        ).pack(
-            anchor="w", padx=8, pady=8
-        )
+        ).pack(anchor="w", padx=8, pady=8)
         ttk.Button(
             tab,
             text="Открыть папку reports",
@@ -147,6 +148,20 @@ class ExpenseSplitterGui:
         ttk.Button(tab, text="Проверить данные", command=self.validate_data).pack(
             anchor="w", padx=8, pady=8
         )
+        ttk.Separator(tab, orient="horizontal").pack(fill="x", padx=8, pady=10)
+        ttk.Label(
+            tab,
+            text=(
+                "Сброс тестовых данных удаляет покупки и периоды, но сохраняет "
+                "участников, группы и категории. Перед очисткой создаются backup-файлы."
+            ),
+            wraplength=720,
+        ).pack(anchor="w", padx=8, pady=4)
+        ttk.Button(
+            tab,
+            text="Сбросить тестовые данные",
+            command=self.reset_test_data,
+        ).pack(anchor="w", padx=8, pady=8)
 
     def _build_help_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
@@ -158,6 +173,8 @@ class ExpenseSplitterGui:
             "Expense Splitter GUI\n\n"
             "Покупки не удаляются при закрытии периода. Закрытие создает снимок "
             "взаиморасчетов и исключает выбранные покупки из текущего open scope.\n\n"
+            "Сброс тестовых данных — отдельная операция: после typed confirm она создает "
+            "backup и очищает покупки и периоды, сохраняя участников, группы и категории.\n\n"
             "HTML и XLSX отчеты будут доступны после соответствующих этапов P2.A.",
         )
         text.configure(state="disabled")
@@ -185,14 +202,8 @@ class ExpenseSplitterGui:
                 self.purchases_tree.insert(
                     "",
                     "end",
-                    values=(
-                        purchase.date.isoformat() if purchase.date else "",
-                        purchase.purchase_name,
-                        f"{purchase.amount:.2f}",
-                        purchase.payer,
-                        ", ".join(purchase.participants),
-                        purchase.settlement_period_id if purchase.settled else "open",
-                    ),
+                    iid=purchase.id,
+                    values=actions.purchase_row(purchase),
                 )
 
         self.run_safely(action, "Покупки обновлены")
@@ -247,11 +258,14 @@ class ExpenseSplitterGui:
 
     def add_purchase(self) -> None:
         names = actions.participant_names(self.state)
-        dialog = AddPurchaseDialog(self.root, names)
+        dialog = AddPurchaseDialog(self.root, names, actions.category_names(self.state))
         self.root.wait_window(dialog)
         if not dialog.result:
             return
         data = dialog.result
+        if not self._confirm_new_categories(data.category):
+            self.status_var.set("Добавление покупки отменено")
+            return
         self.run_safely(
             lambda: actions.add_purchase(
                 self.state,
@@ -266,6 +280,109 @@ class ExpenseSplitterGui:
             "Покупка добавлена",
         )
         self.refresh_all()
+
+    def _confirm_new_categories(self, category_value: str) -> bool:
+        known = {item.casefold() for item in actions.category_names(self.state)}
+        for category in parse_comma_separated(category_value):
+            if category.casefold() in known:
+                continue
+            if not messagebox.askyesno(
+                "Новая категория",
+                f'Категория "{category}" отсутствует в справочнике. Добавить ее?',
+                parent=self.root,
+            ):
+                return False
+            saved_categories = self.run_safely(
+                lambda value=category: actions.add_category(self.state, value)
+            )
+            if saved_categories is None:
+                return False
+            known.add(category.casefold())
+        return True
+
+    def edit_purchase(self) -> None:
+        selected = self.purchases_tree.selection()
+        if not selected:
+            messagebox.showwarning(
+                "Редактирование", "Выберите покупку в таблице.", parent=self.root
+            )
+            return
+        purchase_id = selected[0]
+        purchase = next(
+            (item for item in actions.list_purchases(self.state) if item.id == purchase_id),
+            None,
+        )
+        if purchase is None:
+            messagebox.showerror("Ошибка", "Выбранная покупка не найдена.", parent=self.root)
+            return
+        if purchase.settled or purchase.settlement_period_id:
+            messagebox.showwarning(
+                "Редактирование запрещено",
+                "Покупка относится к закрытому периоду взаиморасчетов. "
+                "Сначала переоткройте период или создайте корректирующую покупку.",
+                parent=self.root,
+            )
+            return
+        dialog = EditPurchaseDialog(
+            self.root,
+            actions.participant_names(self.state),
+            actions.category_names(self.state),
+            purchase,
+        )
+        self.root.wait_window(dialog)
+        if not dialog.result:
+            return
+        data = dialog.result
+        if not self._confirm_new_categories(data.category):
+            self.status_var.set("Редактирование отменено")
+            return
+        updated = self.run_safely(
+            lambda: actions.edit_purchase(
+                self.state,
+                purchase.id,
+                data.purchase_name,
+                data.amount,
+                data.payer,
+                data.participants,
+                data.purchase_date,
+                data.category,
+                data.comment,
+            ),
+            "Покупка изменена",
+        )
+        if updated:
+            self.refresh_all()
+
+    def reset_test_data(self) -> None:
+        if not messagebox.askyesno(
+            "Сброс тестовых данных",
+            "Будет создан backup. Покупки и закрытые периоды взаиморасчетов будут "
+            "очищены. Участники, группы и категории сохранятся. Продолжить?",
+            parent=self.root,
+        ):
+            return
+        confirm = simpledialog.askstring(
+            "Typed confirm",
+            "Введите RESET_TEST_DATA:",
+            parent=self.root,
+        )
+        if confirm != "RESET_TEST_DATA":
+            messagebox.showwarning("Сброс отменен", "Подтверждение не совпало.", parent=self.root)
+            return
+        result = self.run_safely(
+            lambda: actions.reset_test_data(self.state, confirm),
+            "Тестовые данные сброшены",
+        )
+        if result is None:
+            return
+        self.refresh_all()
+        backups = "\n".join(str(path) for path in result.backup_paths) or "Новые файлы были пустыми"
+        messagebox.showinfo(
+            "Сброс завершен",
+            "Покупки и периоды очищены. Участники, группы и категории сохранены.\n\n"
+            f"Backup:\n{backups}",
+            parent=self.root,
+        )
 
     def _period_input(self):
         dialog = ClosePeriodDialog(self.root)

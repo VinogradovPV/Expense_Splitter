@@ -1,0 +1,171 @@
+from datetime import date
+
+import pytest
+
+from expense_splitter.gui import actions
+from expense_splitter.gui.dialogs import (
+    normalize_known_values,
+    parse_comma_separated,
+    purchase_input_from_purchase,
+)
+from expense_splitter.gui.state import GuiState
+from expense_splitter.storage import (
+    load_categories,
+    load_groups,
+    load_participants,
+    load_purchases,
+    load_settlement_periods,
+    save_purchases,
+)
+
+
+def make_state(tmp_path):
+    state = GuiState(data_dir=tmp_path / "data", reports_dir=tmp_path / "reports")
+    state.ensure_data_files()
+    return state
+
+
+def test_manual_participant_parser_and_category_multi_select_values():
+    assert parse_comma_separated("Павел, Сергей, павел, ") == ["Павел", "Сергей"]
+    assert parse_comma_separated("кофе, еда") == ["кофе", "еда"]
+
+
+def test_manual_participants_are_normalized_and_unknown_values_are_rejected():
+    normalized, unknown = normalize_known_values(
+        ["павел", "Сергей", "Новый"],
+        ["Павел", "Сергей"],
+    )
+
+    assert normalized == ["Павел", "Сергей"]
+    assert unknown == ["Новый"]
+
+
+def test_add_and_edit_purchase_with_category(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(
+        state,
+        "Кофе",
+        "100",
+        names[0],
+        names[:2],
+        date(2026, 6, 19).isoformat(),
+        "кофе",
+    )
+
+    updated = actions.edit_purchase(
+        state,
+        purchase.id,
+        "Кофе и еда",
+        "150.50",
+        names[1],
+        names[:3],
+        "2026-06-20",
+        "кофе, еда",
+        "исправлено",
+    )
+
+    assert updated.purchase_name == "Кофе и еда"
+    assert updated.category == "кофе, еда"
+    assert actions.purchase_row(updated)[5] == "кофе, еда"
+    assert load_purchases(state.data_dir / "purchases.yaml") == [updated]
+
+    initial = purchase_input_from_purchase(updated)
+    assert initial.purchase_name == "Кофе и еда"
+    assert initial.amount == "150.50"
+    assert initial.payer == names[1]
+    assert initial.participants == names[:3]
+    assert initial.purchase_date == "2026-06-20"
+    assert initial.category == "кофе, еда"
+    assert initial.comment == "исправлено"
+
+
+def test_purchase_row_shows_uncategorized_fallback(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(state, "Вода", "50", names[0], names[:2], "2026-06-19")
+
+    row = actions.purchase_row(purchase)
+
+    assert row[1] == "Вода"
+    assert row[5] == "Без категории"
+    assert len(row) == 7
+
+
+@pytest.mark.parametrize(
+    ("settled", "period_id"),
+    [(True, None), (False, "period-1")],
+)
+def test_edit_settled_purchase_is_blocked(tmp_path, settled, period_id):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(state, "Кофе", "100", names[0], names[:2], "2026-06-19")
+    stored = load_purchases(state.data_dir / "purchases.yaml")
+    stored[0].settled = settled
+    stored[0].settlement_period_id = period_id
+    save_purchases(state.data_dir / "purchases.yaml", stored)
+
+    with pytest.raises(ValueError, match="закрытому периоду"):
+        actions.edit_purchase(
+            state,
+            purchase.id,
+            "Другое",
+            "120",
+            names[0],
+            names[:2],
+            "2026-06-19",
+        )
+    assert load_purchases(state.data_dir / "purchases.yaml") == stored
+
+
+def test_edit_purchase_validation_does_not_replace_original(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(state, "Кофе", "100", names[0], names[:2], "2026-06-19")
+
+    with pytest.raises(ValueError, match="Участники не найдены"):
+        actions.edit_purchase(
+            state,
+            purchase.id,
+            "Ошибка",
+            "120",
+            names[0],
+            ["Неизвестный"],
+            "2026-06-20",
+        )
+
+    assert load_purchases(state.data_dir / "purchases.yaml") == [purchase]
+
+
+def test_custom_category_and_reset_preserve_reference_data(tmp_path):
+    state = make_state(tmp_path)
+    actions.add_category(state, "офис")
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(
+        state, "Бумага", "200", names[0], names[:2], "2026-06-19", "офис"
+    )
+    period = actions.close_period(state, "2026-06-19", "2026-06-19", "Тестовый период")
+
+    participants_before = load_participants(state.data_dir / "participants.yaml")
+    groups_before = load_groups(state.data_dir / "participants.yaml")
+    categories_before = load_categories(state.data_dir / "categories.yaml")
+    result = actions.reset_test_data(state, "RESET_TEST_DATA")
+
+    assert len(result.backup_paths) == 2
+    assert all(path.exists() for path in result.backup_paths)
+    backed_up_purchases = load_purchases(result.backup_paths[0])
+    backed_up_periods = load_settlement_periods(result.backup_paths[1])
+    assert [item.id for item in backed_up_purchases] == [purchase.id]
+    assert backed_up_purchases[0].settled is True
+    assert [item.id for item in backed_up_periods] == [period.id]
+    assert load_purchases(state.data_dir / "purchases.yaml") == []
+    assert load_settlement_periods(state.data_dir / "settlement_periods.yaml") == []
+    assert load_participants(state.data_dir / "participants.yaml") == participants_before
+    assert load_groups(state.data_dir / "participants.yaml") == groups_before
+    assert load_categories(state.data_dir / "categories.yaml") == categories_before
+
+
+def test_reset_requires_exact_typed_confirmation(tmp_path):
+    state = make_state(tmp_path)
+    with pytest.raises(ValueError, match="RESET_TEST_DATA"):
+        actions.reset_test_data(state, "reset")

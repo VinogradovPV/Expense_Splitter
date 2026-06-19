@@ -142,6 +142,25 @@ Remove-Item -Recurse -Force reports\analytics
 
 Do not delete `data/participants.yaml` or `data/purchases.yaml` unless you intentionally want to remove user data.
 
+### 5.4. Сброс тестовых данных не запускается
+
+GUI принимает только точную строку `RESET_TEST_DATA`. Перед очисткой должны быть доступны для
+записи `data/purchases.yaml` и `data/settlement_periods.yaml`; рядом с ними создаются timestamped
+`.bak`. Не удаляйте backups до проверки результата. Справочники `participants/groups/categories`
+reset-test не очищает.
+
+Если требуется лишь начать новый текущий расчет, используйте закрытие периода, а не reset-test:
+закрытие сохраняет покупки в истории.
+
+### 5.5. Новая категория или участник не сохраняется
+
+Новая категория попадает в `data/categories.yaml` только после подтверждения в GUI. Неизвестные
+участники не создаются из ручного поля автоматически: исправьте имя либо сначала добавьте
+участника в справочник. Регистр известных имён нормализуется к значению из справочника.
+
+Файлы `*.bak`, `.pytest_cache/`, `.ruff_cache/`, `dist/`, `build/`, `reports/` и `*.egg-info/`
+являются generated artifacts и не должны добавляться в Git.
+
 If you encounter an issue not covered here, or if the solutions provided do not resolve your problem, please:
 
 1.  **Check the GitHub Issues**: Someone else might have already reported a similar issue.

@@ -1,5 +1,6 @@
 from expense_splitter.cli import app
 
+
 def main():
     app()
 

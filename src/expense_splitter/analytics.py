@@ -7,9 +7,15 @@ from decimal import Decimal
 from typing import Sequence
 
 from expense_splitter.calculator import calculate_balances
-from expense_splitter.models import DEFAULT_PURCHASE_NAME, Balance, Group, Participant, Purchase, Settlement
+from expense_splitter.models import (
+    DEFAULT_PURCHASE_NAME,
+    Balance,
+    Group,
+    Participant,
+    Purchase,
+    Settlement,
+)
 from expense_splitter.settlement import calculate_settlements
-
 
 UNCATEGORIZED = "Без категории"
 
@@ -248,4 +254,7 @@ def build_warnings(purchases: Sequence[Purchase]) -> list[dict[str, object]]:
 
 
 def _participant_names(participants: Sequence[Participant | str]) -> list[str]:
-    return [participant.name if isinstance(participant, Participant) else str(participant) for participant in participants]
+    return [
+        participant.name if isinstance(participant, Participant) else str(participant)
+        for participant in participants
+    ]

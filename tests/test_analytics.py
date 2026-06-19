@@ -17,7 +17,6 @@ from expense_splitter.analytics import (
 )
 from expense_splitter.models import Participant, Purchase
 
-
 PARTICIPANTS = [Participant(name="Alice"), Participant(name="Bob"), Participant(name="Cara")]
 
 
@@ -45,7 +44,9 @@ def make_purchase(
 def sample_purchases():
     return [
         make_purchase("p1", date(2026, 6, 1), "120.00", "Alice", ["Alice", "Bob"], "Food", "Lunch"),
-        make_purchase("p2", date(2026, 6, 30), "60.00", "Bob", ["Alice", "Bob", "Cara"], None, "Coffee"),
+        make_purchase(
+            "p2", date(2026, 6, 30), "60.00", "Bob", ["Alice", "Bob", "Cara"], None, "Coffee"
+        ),
         make_purchase("p3", date(2026, 7, 1), "90.00", "Cara", ["Cara"], "Travel", "Taxi"),
         make_purchase("p4", None, "30.00", "Alice", ["Alice"], "Food", "Undated"),
     ]

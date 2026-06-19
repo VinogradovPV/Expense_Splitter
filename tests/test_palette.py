@@ -21,7 +21,6 @@ from expense_splitter.visual.palette import (
     color_for_period,
 )
 
-
 HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 

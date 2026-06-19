@@ -1,8 +1,8 @@
-from decimal import Decimal, getcontext
-from typing import List, Dict
 from collections import defaultdict
+from decimal import Decimal, getcontext
+from typing import List
 
-from expense_splitter.models import Purchase, Balance
+from expense_splitter.models import Balance, Purchase
 
 # Set precision for Decimal calculations
 getcontext().prec = 10
@@ -15,9 +15,15 @@ def calculate_balances(purchases: List[Purchase], all_participants: List[str]) -
         # Validate participants in purchase against all_participants
         for p in purchase.participants:
             if p not in all_participants:
-                raise ValueError(f"Participant \'{p}\' in purchase \'{purchase.id}\' not found in global participants list.")
+                raise ValueError(
+                    f"Participant '{p}' in purchase '{purchase.id}' not found in global "
+                    "participants list."
+                )
         if purchase.payer not in all_participants:
-            raise ValueError(f"Payer \'{purchase.payer}\' in purchase \'{purchase.id}\' not found in global participants list.")
+            raise ValueError(
+                f"Payer '{purchase.payer}' in purchase '{purchase.id}' not found in global "
+                "participants list."
+            )
 
         paid_amounts[purchase.payer] += purchase.amount
 

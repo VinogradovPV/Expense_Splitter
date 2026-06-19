@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -58,6 +59,11 @@ yaml.add_constructor(u'!date', DateYamlRepresenter.from_yaml)
 SCHEMA_VERSION = 1
 
 
+@dataclass(frozen=True)
+class ResetTestResult:
+    backup_paths: tuple[Path, ...]
+
+
 def _load_yaml_data(file_path: Path) -> dict:
     if not file_path.exists():
         return {}
@@ -80,10 +86,11 @@ def _create_backup(file_path: Path) -> Path:
     shutil.copy2(file_path, backup_path)
     return backup_path
 
-def _save_yaml_data(file_path: Path, data: dict):
+def _save_yaml_data(file_path: Path, data: dict, *, create_backup: bool = True) -> Path | None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    if file_path.exists():
-        _create_backup(file_path)
+    backup_path = None
+    if create_backup and file_path.exists():
+        backup_path = _create_backup(file_path)
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -100,6 +107,7 @@ def _save_yaml_data(file_path: Path, data: dict):
             os.fsync(f.fileno())
 
         os.replace(temp_path, file_path)
+        return backup_path
     except OSError as exc:
         if temp_path and temp_path.exists():
             temp_path.unlink(missing_ok=True)
@@ -164,7 +172,35 @@ def save_purchases(file_path: Path, purchases: List[Purchase]):
         if isinstance(p_dict.get('date'), date):
             p_dict['date'] = p_dict['date'].isoformat()
         data['purchases'].append(p_dict)
-    _save_yaml_data(file_path, data)
+    return _save_yaml_data(file_path, data)
+
+
+def load_categories(file_path: Path) -> list[str]:
+    data = _load_yaml_data(file_path)
+    values = data.get('categories', [])
+    if not isinstance(values, list):
+        raise StorageError(f"Invalid categories in {file_path}: expected a list.", file_path)
+    return _unique_categories(values)
+
+
+def _unique_categories(categories) -> list[str]:
+    result = []
+    seen = set()
+    for value in categories:
+        category = str(value).strip()
+        key = category.casefold()
+        if category and key not in seen:
+            result.append(category)
+            seen.add(key)
+    return result
+
+
+def save_categories(file_path: Path, categories: list[str]):
+    data = {
+        'schema_version': SCHEMA_VERSION,
+        'categories': _unique_categories(categories),
+    }
+    return _save_yaml_data(file_path, data)
 
 
 def _parse_period_datetime(value) -> datetime:
@@ -246,13 +282,16 @@ def save_settlement_periods(file_path: Path, periods: List[SettlementPeriod]):
                 ),
             }
         )
-    _save_yaml_data(file_path, data)
+    return _save_yaml_data(file_path, data)
 
 
 def initialize_data_files(data_dir: Path, participants: List[Participant], groups: List[Group]):
+    from expense_splitter.defaults import DEFAULT_CATEGORIES
+
     participants_path = data_dir / 'participants.yaml'
     purchases_path = data_dir / 'purchases.yaml'
     settlement_periods_path = data_dir / 'settlement_periods.yaml'
+    categories_path = data_dir / 'categories.yaml'
 
     if not participants_path.exists():
         save_participants(participants_path, participants)
@@ -266,3 +305,31 @@ def initialize_data_files(data_dir: Path, participants: List[Participant], group
             settlement_periods_path,
             {'schema_version': SCHEMA_VERSION, 'settlement_periods': []},
         )
+
+    if not categories_path.exists():
+        save_categories(categories_path, DEFAULT_CATEGORIES)
+
+
+def reset_test_data(data_dir: Path, confirm: str) -> ResetTestResult:
+    if confirm != "RESET_TEST_DATA":
+        raise ValueError("Для сброса введите RESET_TEST_DATA без изменений.")
+
+    purchases_path = data_dir / 'purchases.yaml'
+    periods_path = data_dir / 'settlement_periods.yaml'
+    missing = [path for path in (purchases_path, periods_path) if not path.exists()]
+    if missing:
+        raise StorageError(f"Cannot reset missing data file: {missing[0]}", missing[0])
+
+    # Both backups must exist before either live file is cleared.
+    backup_paths = (_create_backup(purchases_path), _create_backup(periods_path))
+    _save_yaml_data(
+        purchases_path,
+        {'schema_version': SCHEMA_VERSION, 'purchases': []},
+        create_backup=False,
+    )
+    _save_yaml_data(
+        periods_path,
+        {'schema_version': SCHEMA_VERSION, 'settlement_periods': []},
+        create_backup=False,
+    )
+    return ResetTestResult(backup_paths=backup_paths)
