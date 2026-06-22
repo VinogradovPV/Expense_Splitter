@@ -8,7 +8,6 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from expense_splitter.analytics import AnalyticsDataset
 
@@ -107,18 +106,10 @@ def _write_table_sheet(worksheet, sheet_name: str, rows: list[list[str]]) -> Non
     last_column = get_column_letter(max_columns)
     worksheet.freeze_panes = "A4"
     worksheet.auto_filter.ref = f"A3:{last_column}{last_row}"
-    if len(rows) > 1:
-        table = Table(
-            displayName=f"Table{sheet_name.replace(' ', '')}", ref=f"A3:{last_column}{last_row}"
-        )
-        table.tableStyleInfo = TableStyleInfo(
-            name="TableStyleMedium2",
-            showFirstColumn=False,
-            showLastColumn=False,
-            showRowStripes=True,
-            showColumnStripes=False,
-        )
-        worksheet.add_table(table)
+    for row_index in range(4, last_row + 1):
+        if row_index % 2 == 0:
+            for cell in worksheet[row_index]:
+                cell.fill = PatternFill("solid", fgColor="F7FAFC")
 
     if sheet_name == "Warnings":
         for row in worksheet.iter_rows(min_row=4, max_row=last_row):

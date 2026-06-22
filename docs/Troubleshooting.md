@@ -175,6 +175,22 @@ reset-test не очищает.
 XLSX-совместимое приложение, но генерация не требует Microsoft Excel. При повреждении файла
 повторите генерацию; generated `reports/` можно безопасно пересоздать.
 
+Если Excel сообщает о восстановлении `xl/tables/*.xml`, файл создан старой версией P2.A.2.
+Закройте Excel и пересоздайте XLSX: новая версия использует совместимые обычные диапазоны с
+auto-filter без Table XML.
+
+### 5.8. GUI не находит последний отчёт
+
+Кнопки открытия используют папку последнего отчёта, созданного в текущем GUI-сеансе. Сначала
+нажмите `Создать отчёт` с нужным форматом или `all`. Для ранее созданных файлов используйте
+`Открыть папку отчета`.
+
+### 5.9. Покупка не удаляется
+
+Удалять можно только open-покупки и только после ввода `DELETE_PURCHASE`. Покупки закрытого периода
+защищены от удаления. Перед удалением storage автоматически создаёт timestamped backup
+`purchases.yaml.*.bak`.
+
 If you encounter an issue not covered here, or if the solutions provided do not resolve your problem, please:
 
 1.  **Check the GitHub Issues**: Someone else might have already reported a similar issue.

@@ -182,6 +182,27 @@ HTML статический: фильтры и интерактивные гра
 
 Commit, push и GitHub Actions фиксируются после публикации.
 
+## P2.GUI.3 — GUI polish and report-open flows
+
+Дата: 2026-06-19
+Статус: реализовано локально; автоматический gate и основной manual GUI/Excel smoke пройдены,
+manual smoke удаления pending.
+
+Добавлены report-open flows для HTML/XLSX/Markdown/папки, статус последнего отчёта, фильтры и
+сортировка покупок, details/context period, scope open/all, details/reopen settlement periods и
+ручной backup данных. Ошибки файлов показываются через messagebox без traceback.
+
+После manual feedback добавлено защищённое удаление open-покупки: typed confirm `DELETE_PURCHASE`,
+автоматический backup и запрет удаления settled/settlement-period покупок.
+
+Одновременно исправлена совместимость XLSX с Microsoft Excel: удалены проблемные Table XML,
+сохранены обычные auto-filter ranges. Regression test проверяет отсутствие `xl/tables/` parts.
+
+Автоматические проверки после feedback: focused `18 passed`, полный pytest `100 passed`, compileall, encoding,
+Ruff и GUI entry point help — OK. Исправленный XLSX структурно валиден, содержит 10 листов и 6 PNG,
+не содержит `xl/tables/` parts и открывается в Microsoft Excel без recovery. Основные GUI-сценарии
+подтверждены пользователем; pending только ручная проверка нового удаления покупки.
+
 # Expense Splitter Production Ready Progress Report
 
 Дата: 2026-06-18

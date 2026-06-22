@@ -53,18 +53,80 @@ class ExpenseSplitterGui:
         ttk.Button(toolbar, text="Редактировать покупку", command=self.edit_purchase).pack(
             side="left", padx=6
         )
+        ttk.Button(toolbar, text="Детали", command=self.show_purchase_details).pack(
+            side="left", padx=6
+        )
+        ttk.Button(toolbar, text="Удалить покупку", command=self.delete_purchase).pack(
+            side="left", padx=6
+        )
+        ttk.Button(toolbar, text="Период покупки", command=self.show_purchase_period).pack(
+            side="left", padx=6
+        )
+        filters = ttk.LabelFrame(tab, text="Фильтры")
+        filters.pack(fill="x", padx=6, pady=(0, 6))
+        self.purchase_status_var = tk.StringVar(value="all")
+        self.purchase_category_filter_var = tk.StringVar()
+        self.purchase_from_var = tk.StringVar()
+        self.purchase_to_var = tk.StringVar()
+        self.purchase_search_var = tk.StringVar()
+        filter_specs = (
+            ("Статус", self.purchase_status_var, ("all", "open", "settled")),
+            (
+                "Категория",
+                self.purchase_category_filter_var,
+                ("", *actions.category_names(self.state)),
+            ),
+            ("С YYYY-MM-DD", self.purchase_from_var, None),
+            ("По YYYY-MM-DD", self.purchase_to_var, None),
+            ("Поиск", self.purchase_search_var, None),
+        )
+        for column, (label, variable, values) in enumerate(filter_specs):
+            ttk.Label(filters, text=label).grid(row=0, column=column, padx=3, sticky="w")
+            if values is None:
+                ttk.Entry(filters, textvariable=variable, width=16).grid(
+                    row=1, column=column, padx=3
+                )
+            else:
+                ttk.Combobox(
+                    filters, textvariable=variable, values=values, state="readonly", width=16
+                ).grid(row=1, column=column, padx=3)
+        ttk.Button(filters, text="Применить", command=self.refresh_purchases).grid(
+            row=1, column=5, padx=6
+        )
+        self.purchase_sort_by = "date"
+        self.purchase_sort_desc = True
         self.purchases_tree = make_tree(
             tab,
             ("Дата", "Покупка", "Сумма", "Плательщик", "Участники", "Категория", "Статус"),
         )
         self.purchases_tree.pack(fill="both", expand=True, padx=6, pady=6)
+        for column, sort_key in {
+            "Дата": "date",
+            "Сумма": "amount",
+            "Категория": "category",
+            "Плательщик": "payer",
+        }.items():
+            self.purchases_tree.heading(
+                column, text=column, command=lambda key=sort_key: self.sort_purchases(key)
+            )
 
     def _build_balances_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Текущие расчеты")
-        ttk.Button(tab, text="Обновить", command=self.refresh_calculations).pack(
-            anchor="w", padx=6, pady=6
-        )
+        toolbar = ttk.Frame(tab)
+        toolbar.pack(fill="x", padx=6, pady=6)
+        self.calculation_scope_var = tk.StringVar(value="open")
+        ttk.Button(toolbar, text="Обновить", command=self.refresh_calculations).pack(side="left")
+        ttk.Button(
+            toolbar, text="Только открытые", command=lambda: self.set_calculation_scope("open")
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
+            text="Показать все с историей",
+            command=lambda: self.set_calculation_scope("all"),
+        ).pack(side="left", padx=6)
+        self.scope_label_var = tk.StringVar()
+        ttk.Label(tab, textvariable=self.scope_label_var, wraplength=900).pack(anchor="w", padx=6)
         pane = ttk.PanedWindow(tab, orient="horizontal")
         pane.pack(fill="both", expand=True, padx=6, pady=6)
         balances_frame = ttk.LabelFrame(pane, text="Балансы open scope")
@@ -90,6 +152,12 @@ class ExpenseSplitterGui:
             text="Закрыть период и обнулить текущие взаиморасчеты",
             command=self.close_period_flow,
         ).pack(side="left", padx=6)
+        ttk.Button(toolbar, text="Детали периода", command=self.show_period_details).pack(
+            side="left", padx=6
+        )
+        ttk.Button(toolbar, text="Переоткрыть период", command=self.reopen_period).pack(
+            side="left", padx=6
+        )
         self.periods_tree = make_tree(
             tab,
             ("ID", "Название", "Статус", "С", "По", "Покупок", "Сумма"),
@@ -107,6 +175,7 @@ class ExpenseSplitterGui:
         self.analytics_quarter_var = tk.StringVar(value="1")
         self.analytics_format_var = tk.StringVar(value="all")
         self.last_analytics_report_dir: Path | None = None
+        self.last_report_status_var = tk.StringVar(value="Отчёт ещё не создавался")
         rows = (
             ("Период", self.analytics_period_var, ("month", "quarter", "year")),
             ("Год", self.analytics_year_var, None),
@@ -133,14 +202,20 @@ class ExpenseSplitterGui:
         )
         ttk.Button(
             form,
-            text="Открыть папку reports",
-            command=lambda: self.open_path(self.state.reports_dir),
+            text="Открыть папку отчета",
+            command=self.open_report_folder,
         ).grid(row=len(rows), column=1, sticky="ew", padx=4, pady=8)
         ttk.Button(form, text="Открыть HTML", command=self.open_html_report).grid(
             row=len(rows) + 1, column=0, sticky="ew", padx=4, pady=4
         )
         ttk.Button(form, text="Открыть XLSX", command=self.open_xlsx_report).grid(
             row=len(rows) + 1, column=1, sticky="ew", padx=4, pady=4
+        )
+        ttk.Button(form, text="Открыть Markdown", command=self.open_markdown_report).grid(
+            row=len(rows) + 2, column=0, columnspan=2, sticky="ew", padx=4, pady=4
+        )
+        ttk.Label(form, textvariable=self.last_report_status_var, wraplength=500).grid(
+            row=len(rows) + 3, column=0, columnspan=2, sticky="w", padx=4, pady=8
         )
 
     def _build_data_tab(self) -> None:
@@ -173,6 +248,9 @@ class ExpenseSplitterGui:
             text="Сбросить тестовые данные",
             command=self.reset_test_data,
         ).pack(anchor="w", padx=8, pady=8)
+        ttk.Button(tab, text="Создать backup данных", command=self.create_backup).pack(
+            anchor="w", padx=8, pady=8
+        )
 
     def _build_help_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
@@ -209,7 +287,17 @@ class ExpenseSplitterGui:
     def refresh_purchases(self) -> None:
         def action():
             clear_tree(self.purchases_tree)
-            for purchase in actions.list_purchases(self.state):
+            purchases = actions.filter_and_sort_purchases(
+                actions.list_purchases(self.state),
+                status=self.purchase_status_var.get(),
+                category=self.purchase_category_filter_var.get(),
+                date_from=self.purchase_from_var.get().strip(),
+                date_to=self.purchase_to_var.get().strip(),
+                search=self.purchase_search_var.get(),
+                sort_by=self.purchase_sort_by,
+                descending=self.purchase_sort_desc,
+            )
+            for purchase in purchases:
                 self.purchases_tree.insert(
                     "",
                     "end",
@@ -219,10 +307,102 @@ class ExpenseSplitterGui:
 
         self.run_safely(action, "Покупки обновлены")
 
+    def sort_purchases(self, sort_by: str) -> None:
+        if self.purchase_sort_by == sort_by:
+            self.purchase_sort_desc = not self.purchase_sort_desc
+        else:
+            self.purchase_sort_by = sort_by
+            self.purchase_sort_desc = False
+        self.refresh_purchases()
+
+    def _selected_purchase(self):
+        selected = self.purchases_tree.selection()
+        if not selected:
+            messagebox.showwarning("Покупки", "Выберите покупку в таблице.", parent=self.root)
+            return None
+        purchase_id = selected[0]
+        return next(
+            (item for item in actions.list_purchases(self.state) if item.id == purchase_id),
+            None,
+        )
+
+    def show_purchase_details(self) -> None:
+        purchase = self._selected_purchase()
+        if purchase is None:
+            return
+        messagebox.showinfo(
+            "Детали покупки",
+            f"Покупка: {purchase.purchase_name}\nДата: {purchase.date}\n"
+            f"Сумма: {purchase.amount:.2f}\nПлательщик: {purchase.payer}\n"
+            f"Участники: {', '.join(purchase.participants)}\n"
+            f"Категория: {purchase.category or 'Без категории'}\n"
+            f"Комментарий: {purchase.comment or '—'}\n"
+            f"Статус: {'settled' if purchase.settled else 'open'}",
+            parent=self.root,
+        )
+
+    def delete_purchase(self) -> None:
+        purchase = self._selected_purchase()
+        if purchase is None:
+            return
+        if purchase.settled or purchase.settlement_period_id:
+            messagebox.showwarning(
+                "Удаление запрещено",
+                "Закрытую покупку удалить нельзя. Сначала переоткройте период "
+                "или создайте корректирующую покупку.",
+                parent=self.root,
+            )
+            return
+        if not messagebox.askyesno(
+            "Удалить покупку",
+            f'Будет создан backup. Удалить покупку "{purchase.purchase_name}"?',
+            parent=self.root,
+        ):
+            return
+        confirm = simpledialog.askstring(
+            "Typed confirm",
+            "Введите DELETE_PURCHASE:",
+            parent=self.root,
+        )
+        if confirm != "DELETE_PURCHASE":
+            messagebox.showwarning(
+                "Удаление отменено", "Подтверждение не совпало.", parent=self.root
+            )
+            return
+        deleted = self.run_safely(
+            lambda: actions.delete_purchase(self.state, purchase.id, confirm),
+            "Покупка удалена",
+        )
+        if deleted:
+            self.refresh_all()
+
+    def show_purchase_period(self) -> None:
+        purchase = self._selected_purchase()
+        if purchase is None:
+            return
+        if not purchase.settlement_period_id:
+            messagebox.showinfo(
+                "Период покупки",
+                "Покупка открыта и не относится к закрытому периоду.",
+                parent=self.root,
+            )
+            return
+        self._show_period(actions.settlement_period(self.state, purchase.settlement_period_id))
+
+    def set_calculation_scope(self, scope: str) -> None:
+        self.calculation_scope_var.set(scope)
+        self.refresh_calculations()
+
     def refresh_calculations(self) -> None:
         def action():
+            scope = self.calculation_scope_var.get()
+            self.scope_label_var.set(
+                "Scope: open — закрытые покупки не входят в текущие расчёты."
+                if scope == "open"
+                else "Scope: all — показан расчёт по всей истории, включая закрытые покупки."
+            )
             clear_tree(self.balances_tree)
-            for balance in actions.current_balances(self.state):
+            for balance in actions.balances(self.state, scope):
                 self.balances_tree.insert(
                     "",
                     "end",
@@ -234,7 +414,7 @@ class ExpenseSplitterGui:
                     ),
                 )
             clear_tree(self.settlements_tree)
-            for settlement in actions.current_settlements(self.state):
+            for settlement in actions.settlements(self.state, scope):
                 self.settlements_tree.insert(
                     "",
                     "end",
@@ -254,6 +434,7 @@ class ExpenseSplitterGui:
                 self.periods_tree.insert(
                     "",
                     "end",
+                    iid=period.id,
                     values=(
                         period.id,
                         period.name,
@@ -266,6 +447,52 @@ class ExpenseSplitterGui:
                 )
 
         self.run_safely(action, "Периоды обновлены")
+
+    def _selected_period(self):
+        selected = self.periods_tree.selection()
+        if not selected:
+            messagebox.showwarning("Периоды", "Выберите период в таблице.", parent=self.root)
+            return None
+        return actions.settlement_period(self.state, selected[0])
+
+    def _show_period(self, period) -> None:
+        transfers = (
+            "\n".join(
+                f"{item.from_participant} → {item.to_participant}: {item.amount:.2f}"
+                for item in period.settlements
+            )
+            or "Переводов нет"
+        )
+        messagebox.showinfo(
+            "Детали периода",
+            f"ID: {period.id}\nНазвание: {period.name}\nСтатус: {period.status}\n"
+            f"Даты: {period.date_from} — {period.date_to}\n"
+            f"Покупок: {len(period.purchase_ids)}\nСумма: {period.total_amount:.2f}\n\n"
+            f"Переводы:\n{transfers}",
+            parent=self.root,
+        )
+
+    def show_period_details(self) -> None:
+        period = self._selected_period()
+        if period:
+            self._show_period(period)
+
+    def reopen_period(self) -> None:
+        period = self._selected_period()
+        if not period:
+            return
+        if not messagebox.askyesno(
+            "Переоткрыть период",
+            "Покупки периода снова войдут в текущие расчёты. Продолжить?",
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.reopen_period(self.state, period.id),
+            "Период переоткрыт",
+        )
+        if result:
+            self.refresh_all()
 
     def add_purchase(self) -> None:
         names = actions.participant_names(self.state)
@@ -463,6 +690,9 @@ class ExpenseSplitterGui:
         report_dir = self.run_safely(action, "Аналитический отчет создан")
         if report_dir:
             self.last_analytics_report_dir = report_dir
+            self.last_report_status_var.set(
+                f"Последний отчёт: {report_dir} ({self.analytics_format_var.get()})"
+            )
             messagebox.showinfo("Отчет создан", f"Папка отчета:\n{report_dir}", parent=self.root)
 
     def open_html_report(self) -> None:
@@ -474,8 +704,7 @@ class ExpenseSplitterGui:
             )
             return
         self.run_safely(
-            lambda: actions.open_html_report(self.last_analytics_report_dir),
-            "HTML-отчёт открыт",
+            lambda: actions.open_report(self.last_analytics_report_dir, "html"), "HTML-отчёт открыт"
         )
 
     def open_xlsx_report(self) -> None:
@@ -487,9 +716,20 @@ class ExpenseSplitterGui:
             )
             return
         self.run_safely(
-            lambda: actions.open_xlsx_report(self.last_analytics_report_dir),
-            "XLSX-отчёт открыт",
+            lambda: actions.open_report(self.last_analytics_report_dir, "xlsx"), "XLSX-отчёт открыт"
         )
+
+    def open_markdown_report(self) -> None:
+        if self.last_analytics_report_dir is None:
+            messagebox.showerror("Markdown не найден", "Сначала создайте отчёт.", parent=self.root)
+            return
+        self.run_safely(
+            lambda: actions.open_report(self.last_analytics_report_dir, "markdown"),
+            "Markdown-отчёт открыт",
+        )
+
+    def open_report_folder(self) -> None:
+        self.open_path(self.last_analytics_report_dir or self.state.analytics_dir)
 
     def open_path(self, path: Path) -> None:
         self.run_safely(lambda: actions.open_folder(path), f"Открыта папка {path}")
@@ -505,6 +745,11 @@ class ExpenseSplitterGui:
             )
 
         self.run_safely(action, "Данные проверены")
+
+    def create_backup(self) -> None:
+        path = self.run_safely(lambda: actions.create_data_backup(self.state), "Backup создан")
+        if path:
+            messagebox.showinfo("Backup создан", f"Папка backup:\n{path}", parent=self.root)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -137,6 +137,33 @@ def test_edit_purchase_validation_does_not_replace_original(tmp_path):
     assert load_purchases(state.data_dir / "purchases.yaml") == [purchase]
 
 
+def test_delete_open_purchase_requires_typed_confirmation_and_creates_backup(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(state, "Ошибка ввода", "100", names[0], names[:2], "2026-06-19")
+    with pytest.raises(ValueError, match="DELETE_PURCHASE"):
+        actions.delete_purchase(state, purchase.id, "delete")
+
+    deleted = actions.delete_purchase(state, purchase.id, "DELETE_PURCHASE")
+
+    assert deleted.id == purchase.id
+    assert load_purchases(state.data_dir / "purchases.yaml") == []
+    assert list(state.data_dir.glob("purchases.yaml.*.bak"))
+
+
+def test_delete_settled_purchase_is_blocked(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(state, "Закрытая", "100", names[0], names[:2], "2026-06-19")
+    stored = load_purchases(state.data_dir / "purchases.yaml")
+    stored[0].settled = True
+    stored[0].settlement_period_id = "period-1"
+    save_purchases(state.data_dir / "purchases.yaml", stored)
+
+    with pytest.raises(ValueError, match="Закрытую покупку"):
+        actions.delete_purchase(state, purchase.id, "DELETE_PURCHASE")
+
+
 def test_custom_category_and_reset_preserve_reference_data(tmp_path):
     state = make_state(tmp_path)
     actions.add_category(state, "офис")

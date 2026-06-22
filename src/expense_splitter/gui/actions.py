@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import subprocess
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -18,8 +19,10 @@ from expense_splitter.settlement import calculate_settlements
 from expense_splitter.settlement_periods import (
     close_settlement_period,
     filter_purchases_by_settlement_scope,
+    get_settlement_period,
     parse_period_date,
     preview_settlement_period,
+    reopen_settlement_period,
 )
 from expense_splitter.storage import (
     initialize_data_files,
@@ -57,6 +60,53 @@ def group_names(state: GuiState) -> list[str]:
 def list_purchases(state: GuiState) -> list[Purchase]:
     ensure_data(state)
     return load_purchases(state.data_dir / "purchases.yaml")
+
+
+def filter_and_sort_purchases(
+    purchases: list[Purchase],
+    *,
+    status: str = "all",
+    category: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    search: str = "",
+    sort_by: str = "date",
+    descending: bool = False,
+) -> list[Purchase]:
+    if status not in {"open", "settled", "all"}:
+        raise ValueError("Статус фильтра должен быть open, settled или all.")
+    start = parse_period_date(date_from) if date_from else None
+    end = parse_period_date(date_to) if date_to else None
+    if start and end and start > end:
+        raise ValueError("Дата начала фильтра не может быть позже даты окончания.")
+    query = search.strip().casefold()
+    category_key = category.strip().casefold()
+    result = []
+    for purchase in purchases:
+        is_settled = bool(purchase.settled or purchase.settlement_period_id)
+        if status == "open" and is_settled:
+            continue
+        if status == "settled" and not is_settled:
+            continue
+        if category_key and (purchase.category or "без категории").casefold() != category_key:
+            continue
+        if start and (purchase.date is None or purchase.date < start):
+            continue
+        if end and (purchase.date is None or purchase.date > end):
+            continue
+        if query and query not in purchase.purchase_name.casefold():
+            continue
+        result.append(purchase)
+
+    keys = {
+        "date": lambda item: item.date or date.min,
+        "amount": lambda item: item.amount,
+        "category": lambda item: (item.category or "").casefold(),
+        "payer": lambda item: item.payer.casefold(),
+    }
+    if sort_by not in keys:
+        raise ValueError("Неизвестное поле сортировки.")
+    return sorted(result, key=keys[sort_by], reverse=descending)
 
 
 def purchase_row(purchase: Purchase) -> tuple[str, ...]:
@@ -171,19 +221,47 @@ def edit_purchase(
     return updated
 
 
+def delete_purchase(state: GuiState, purchase_id: str, confirm: str) -> Purchase:
+    if confirm != "DELETE_PURCHASE":
+        raise ValueError("Для удаления введите DELETE_PURCHASE без изменений.")
+    purchases = list_purchases(state)
+    try:
+        purchase = next(item for item in purchases if item.id == purchase_id)
+    except StopIteration as exc:
+        raise ValueError(f"Покупка не найдена: {purchase_id}") from exc
+    if purchase.settled or purchase.settlement_period_id:
+        raise ValueError(
+            "Закрытую покупку удалить нельзя. Сначала переоткройте период "
+            "или создайте корректирующую покупку."
+        )
+    save_purchases(
+        state.data_dir / "purchases.yaml",
+        [item for item in purchases if item.id != purchase_id],
+    )
+    return purchase
+
+
 def reset_test_data(state: GuiState, confirm: str):
     ensure_data(state)
     return storage_reset_test_data(state.data_dir, confirm)
 
 
-def current_balances(state: GuiState):
+def balances(state: GuiState, scope: str = "open"):
     names = participant_names(state)
-    purchases = filter_purchases_by_settlement_scope(list_purchases(state), scope="open")
+    purchases = filter_purchases_by_settlement_scope(list_purchases(state), scope=scope)
     return calculate_balances(purchases, names)
 
 
+def current_balances(state: GuiState):
+    return balances(state, "open")
+
+
+def settlements(state: GuiState, scope: str = "open"):
+    return calculate_settlements(balances(state, scope))
+
+
 def current_settlements(state: GuiState):
-    return calculate_settlements(current_balances(state))
+    return settlements(state, "open")
 
 
 def settlement_periods(state: GuiState):
@@ -212,6 +290,19 @@ def close_period(state: GuiState, date_from: str, date_to: str, name: str):
         name,
         created_by="gui",
     )
+    save_purchases(state.data_dir / "purchases.yaml", purchases)
+    save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
+    return period
+
+
+def settlement_period(state: GuiState, period_id: str):
+    return get_settlement_period(settlement_periods(state), period_id)
+
+
+def reopen_period(state: GuiState, period_id: str):
+    purchases = list_purchases(state)
+    periods = settlement_periods(state)
+    period = reopen_settlement_period(purchases, periods, period_id)
     save_purchases(state.data_dir / "purchases.yaml", purchases)
     save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
     return period
@@ -266,3 +357,39 @@ def open_xlsx_report(report_dir: Path) -> None:
         subprocess.Popen(["open", str(xlsx_path)])
     else:
         subprocess.Popen(["xdg-open", str(xlsx_path)])
+
+
+def report_path(report_dir: Path, report_type: str) -> Path:
+    patterns = {
+        "html": "analytics_dashboard.html",
+        "markdown": "analytics_report.md",
+        "xlsx": "expense_analytics_*.xlsx",
+    }
+    if report_type not in patterns:
+        raise ValueError("Неизвестный тип отчёта.")
+    matches = sorted(report_dir.glob(patterns[report_type]))
+    if not matches:
+        label = report_type.upper() if report_type != "markdown" else "Markdown"
+        raise FileNotFoundError(
+            f"{label}-отчёт не создан. Сначала создайте отчёт в нужном формате или all."
+        )
+    return matches[0]
+
+
+def open_report(report_dir: Path, report_type: str) -> None:
+    path = report_path(report_dir, report_type)
+    if platform.system() == "Windows":
+        os.startfile(path)  # type: ignore[attr-defined]
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
+def create_data_backup(state: GuiState) -> Path:
+    ensure_data(state)
+    target = state.data_dir / "backups" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    target.mkdir(parents=True, exist_ok=False)
+    for path in state.data_dir.glob("*.yaml"):
+        shutil.copy2(path, target / path.name)
+    return target

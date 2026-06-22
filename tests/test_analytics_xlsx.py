@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from zipfile import ZipFile
 
 from openpyxl import load_workbook
 from typer.testing import CliRunner
@@ -74,6 +75,8 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     assert purchases.freeze_panes == "A4"
     assert purchases.auto_filter.ref
     assert len(workbook["Charts"]._images) == 6
+    with ZipFile(path) as archive:
+        assert not any(name.startswith("xl/tables/") for name in archive.namelist())
 
 
 def test_xlsx_empty_period_has_warnings_and_chart_message(tmp_path):
