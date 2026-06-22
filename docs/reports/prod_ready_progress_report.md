@@ -185,8 +185,7 @@ Commit, push и GitHub Actions фиксируются после публика�
 ## P2.GUI.3 — GUI polish and report-open flows
 
 Дата: 2026-06-19
-Статус: реализовано локально; автоматический gate и основной manual GUI/Excel smoke пройдены,
-manual smoke удаления pending.
+Статус: завершено, опубликовано; автоматический gate, manual GUI/Excel smoke и CI пройдены.
 
 Добавлены report-open flows для HTML/XLSX/Markdown/папки, статус последнего отчёта, фильтры и
 сортировка покупок, details/context period, scope open/all, details/reopen settlement periods и
@@ -201,12 +200,12 @@ manual smoke удаления pending.
 Автоматические проверки после feedback: focused `18 passed`, полный pytest `100 passed`, compileall, encoding,
 Ruff и GUI entry point help — OK. Исправленный XLSX структурно валиден, содержит 10 листов и 6 PNG,
 не содержит `xl/tables/` parts и открывается в Microsoft Excel без recovery. Основные GUI-сценарии
-подтверждены пользователем; pending только ручная проверка нового удаления покупки.
+подтверждены пользователем. Commit: `b344a5d`; GitHub Actions run `27931751603` — success.
 
 ## P2.DOC.1 — Documentation cleanup
 
 Дата: 2026-06-22
-Статус: реализовано локально; quality gate пройден, публикация pending.
+Статус: завершено, опубликовано; quality gate и CI пройдены.
 
 README полностью перестроен как пользовательская входная страница: GUI-first quick start,
 покупки, безопасность данных, settlement periods, все форматы аналитики, CLI, PowerShell,
@@ -221,6 +220,52 @@ flows, безопасным удалением, reset-test, backups и трем�
 
 Проверки: placeholder scan — OK; документированные пути — существуют; encoding/mojibake — OK;
 полный pytest — `100 passed`; compileall — OK; `git diff --check` выполняется перед commit.
+
+Commit: `b4a43ac`; GitHub Actions run `27931999659` — success.
+
+## P2.REL.1 — Release quality gate
+
+Дата: 2026-06-22
+Ветка: `prod-ready/p0-p1`
+Проверенный commit: `b4a43ac`
+Статус: **production-ready candidate**.
+
+### Проверки
+
+- Установка: обновлены `pip`, `setuptools`, `wheel`; editable install `.[dev]` и
+  `scripts/install.ps1 -Dev` выполнены успешно.
+- Quality gate: `100 passed in 7.84s`; compileall, encoding/mojibake checker, Ruff и
+  `git diff --check` — OK.
+- CLI smoke: help для основного CLI, analytics и settlement-period; в изолированном
+  `.tmp/p2_rel_1` пройдены init, add/list, balances/settle scope open и preview периода.
+- Analytics smoke: отчёты month/quarter/year содержат Markdown, HTML, metadata.json,
+  по 9 CSV, по 6 PNG и XLSX. Все XLSX читаются `openpyxl`, содержат 10 листов и не
+  содержат проблемных `xl/tables/` частей.
+- GUI smoke: entry-point и PowerShell help — OK. Полный manual smoke P2.GUI.3 подтверждён
+  пользователем: покупки, фильтры, HTML/XLSX, close/reset-test, отсутствие traceback и mojibake.
+- Data safety: smoke использовал только ignored temp data; реальные пользовательские YAML не
+  изменялись. Тесты подтверждают разделение reset-test и закрытия периода, backups и сохранение
+  participants/groups/categories при reset-test.
+- PyInstaller: `scripts/build-windows.ps1 -NoUpx` завершён успешно; созданы три ignored exe.
+  Standalone CLI `--help` и GUI `--help` завершились с кодом 0; console launcher показал меню.
+- GitHub Actions: CI для проверенного commit — success (`27931999659`). Workflow
+  `build-release.yml` запускается вручную или по tag `v*.*.*`; tag-triggered release ещё не проверен.
+- Generated artifacts: `.tmp/`, `reports/`, `build/`, `dist/`, caches, egg-info и `.bak`
+  остаются ignored и не включаются в staging.
+
+### Известные ограничения
+
+- Полная публикация GitHub Release требует отдельного тестового release tag.
+- После принудительно остановленных one-file процессов текущий automation host оставляет `_MEI*`
+  в `%TEMP%`; повторный запуск с повторно использованным PID может требовать новый процесс/сеанс.
+  Чистая сборка и первые standalone CLI/GUI запуски прошли успешно.
+- Предупреждение pip о несуществующем extra `typer[all]` не блокирует установку: нужные runtime
+  зависимости установлены, но declaration можно упростить в следующем maintenance-релизе.
+
+### Решение
+
+P0 blockers не выявлены. Кандидат готов к созданию release tag и проверке tag-triggered
+Build Release workflow.
 
 # Expense Splitter Production Ready Progress Report
 
