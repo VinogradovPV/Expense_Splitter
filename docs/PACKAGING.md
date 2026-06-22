@@ -1,103 +1,56 @@
-# Packaging Expense Splitter
-
-Документ описывает сборку standalone-исполняемых файлов Expense Splitter через
-PyInstaller.
+# Упаковка Expense Splitter
 
 ## Требования
 
-- Python 3.11 или новее.
-- `pip`.
-- Установленные dev-зависимости проекта: `python -m pip install -e ".[dev]"`.
+- Python 3.11+;
+- dev-зависимости `python -m pip install -e ".[dev]"`;
+- PyInstaller из проектной `.venv`.
 
-Скрипты сборки создают или используют локальное окружение `.venv` и ставят
-проект в editable-режиме с dev-зависимостями.
-
-## Структура
-
-Целевая структура P0:
-
-```text
-.
-├── pyproject.toml
-├── src/expense_splitter/
-├── packaging/expense_splitter.spec
-├── scripts/build-windows.ps1
-├── scripts/build-unix.sh
-├── build/   # generated, ignored by git
-└── dist/    # generated, ignored by git
-```
-
-`packaging/expense_splitter.spec` вычисляет корень проекта от своего
-расположения и использует `src/` как путь импортов. Пользовательская рабочая
-директория `data/` не встраивается в исполняемые файлы: данные создаются и
-читаются в runtime-рабочей директории приложения.
+Пользовательская папка `data/` не встраивается в executables: приложение читает и создаёт данные в
+runtime-рабочей директории.
 
 ## Windows
 
-Из корня проекта:
-
 ```powershell
-.\scripts\build-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1 -NoUpx
 ```
 
-Без UPX:
-
-```powershell
-.\scripts\build-windows.ps1 -NoUpx
-```
+Скрипт использует `packaging/expense_splitter.spec`, создаёт `.venv` при необходимости, устанавливает
+dev-зависимости и пишет generated output в `build/` и `dist/`.
 
 Ожидаемые файлы:
 
 ```text
 dist/expense-splitter.exe
 dist/expense-splitter-launcher.exe
+dist/expense-splitter-gui.exe
 ```
 
-Проверка:
+`expense-splitter-gui.exe` собирается с `console=False`; CLI и console launcher сохраняют консоль.
 
 ```powershell
 .\dist\expense-splitter.exe --help
 .\dist\expense-splitter-launcher.exe --help
+.\dist\expense-splitter-gui.exe --help
 ```
 
 ## Linux/macOS
 
-Из корня проекта:
-
 ```bash
 ./scripts/build-unix.sh
-```
-
-Без UPX:
-
-```bash
 ./scripts/build-unix.sh --noupx
 ```
 
-Ожидаемые файлы:
+Spec создаёт CLI, launcher и GUI targets для текущей платформы. Tkinter должен присутствовать в
+системной поставке Python.
 
-```text
-dist/expense-splitter
-dist/expense-splitter-launcher
-```
+## GitHub Actions
 
-Проверка:
+`.github/workflows/ci.yml` запускает quality checks на push/PR. `.github/workflows/build-release.yml`
+собирает release artifacts по настроенным branch/tag triggers; перед релизом проверьте актуальные
+условия непосредственно в workflow и выполните P2.REL.1.
 
-```bash
-./dist/expense-splitter --help
-./dist/expense-splitter-launcher --help
-```
+## Generated artifacts
 
-## Git
-
-`dist/` и `build/` являются generated artifacts и не должны попадать в commit.
-Они уже перечислены в `.gitignore`.
-
-## Troubleshooting
-
-- Если PyInstaller не найден, переустановите dev-зависимости:
-  `python -m pip install -e ".[dev]"`.
-- Если сборка падает на путях, запускайте скрипт из корня проекта и проверьте,
-  что существует `src/expense_splitter`.
-- Если exe запускается, но не видит пользовательские данные, выполните
-  `expense-splitter init` в нужной рабочей папке. Данные не встраиваются в exe.
+`build/` и `dist/` игнорируются Git. Не добавляйте exe, PyInstaller work files, caches и локальные
+reports в обычный source commit.

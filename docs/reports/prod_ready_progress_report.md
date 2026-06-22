@@ -203,6 +203,25 @@ Ruff и GUI entry point help — OK. Исправленный XLSX структ�
 не содержит `xl/tables/` parts и открывается в Microsoft Excel без recovery. Основные GUI-сценарии
 подтверждены пользователем; pending только ручная проверка нового удаления покупки.
 
+## P2.DOC.1 — Documentation cleanup
+
+Дата: 2026-06-22
+Статус: реализовано локально; quality gate пройден, публикация pending.
+
+README полностью перестроен как пользовательская входная страница: GUI-first quick start,
+покупки, безопасность данных, settlement periods, все форматы аналитики, CLI, PowerShell,
+standalone, troubleshooting, документация, development и roadmap. Исторические Manus/P0-блоки,
+старые ограничения и хронология удалены из README.
+
+Переписаны на русском `USER_GUIDE.md`, `ANALYTICS.md`, `SETTLEMENT_PERIODS.md`, `DATA_SCHEMA.md`,
+`Troubleshooting.md` и `PACKAGING.md`. Документы синхронизированы с HTML/XLSX, GUI filters/report
+flows, безопасным удалением, reset-test, backups и тремя PyInstaller executables.
+
+История предыдущих этапов ниже сохранена без переписывания.
+
+Проверки: placeholder scan — OK; документированные пути — существуют; encoding/mojibake — OK;
+полный pytest — `100 passed`; compileall — OK; `git diff --check` выполняется перед commit.
+
 # Expense Splitter Production Ready Progress Report
 
 Дата: 2026-06-18

@@ -1,720 +1,98 @@
-# Проект Expense Splitter
+# Expense Splitter
 
-## Desktop GUI launcher
+## Что это
 
-Основной пользовательский вход для Windows теперь доступен через отдельный GUI launcher на `tkinter`.
-Он не запускает консольное меню и не требует ввода CLI-команд:
+Expense Splitter — локальное приложение для учёта совместных покупок, расчёта долгов, закрытия
+периодов взаиморасчётов и формирования аналитических отчётов. Основной интерфейс — desktop GUI на
+`tkinter`; CLI доступен для автоматизации и продвинутых сценариев.
+
+Приложение работает с локальными YAML-файлами, не требует web-server и создаёт offline HTML/XLSX.
+
+## Основные возможности
+
+- добавление, редактирование и защищённое удаление открытых покупок;
+- участники и категории через checklist, ComboBox или ручной ввод;
+- фильтры по статусу, категории, датам и названию, сортировка таблицы;
+- расчёты в scope `open` или по всей истории `all`;
+- закрытие и переоткрытие периодов без удаления истории;
+- аналитика в Markdown, CSV, PNG, offline HTML и XLSX;
+- безопасные backups и reset-test с typed confirmation;
+- Windows standalone executables через PyInstaller.
+
+## Быстрый старт Windows
+
+Требуется Python 3.11+.
+
+```powershell
+cd C:\path\to\expense_splitter
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1
+```
+
+Для разработки:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Dev
+```
+
+## Запуск Desktop GUI
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1
 ```
 
-После editable/install также доступен entry point:
+Или после установки:
 
 ```powershell
 expense-splitter-gui
-expense-splitter-gui --help
 ```
 
-GUI содержит разделы `Покупки`, `Текущие расчеты`, `Периоды взаиморасчетов`,
-`Аналитика и отчеты`, `Данные и обслуживание`, `Справка`. Кнопка
-`Закрыть период и обнулить текущие взаиморасчеты` создает preview, требует подтверждение
-и закрывает период без удаления покупок.
+GUI содержит вкладки `Покупки`, `Текущие расчёты`, `Периоды взаиморасчётов`, `Аналитика и отчёты`,
+`Данные и обслуживание`, `Справка`. Консольное меню для GUI не требуется.
 
-## 0. Цель этапа
+## Первый сценарий
 
-Доработать уже реализованный проект `expense-splitter` до состояния, пригодного для установки и использования на обычной машине без ручной разработки в терминале.
+1. Инициализируйте данные командой `expense-splitter init` либо запустите GUI — недостающие файлы
+   будут созданы автоматически.
+2. На вкладке `Покупки` нажмите `Добавить покупку`, заполните сумму, плательщика, участников,
+   категорию и дату.
+3. Для исправления выберите строку и нажмите `Редактировать покупку`. Закрытые покупки защищены.
+4. Откройте `Текущие расчёты`: scope `open` показывает балансы и необходимые переводы только по
+   незакрытым покупкам.
+5. На вкладке периодов выполните preview и нажмите `Закрыть период и обнулить текущие
+   взаиморасчёты`. Покупки останутся в истории.
+6. В разделе аналитики выберите месяц, квартал или год, формат `all`, затем откройте HTML/XLSX или
+   папку отчёта.
 
-Нужно реализовать:
+## Данные и безопасность
 
-1. Установщик проекта.
-2. Кроссплатформенные сценарии запуска.
-3. UX launcher для пользователя.
-4. Полный README с описанием проекта и инструкциями.
-5. Обновление `REPORT.md` на каждом этапе.
-6. Улучшения качества, упаковки, GitHub workflow и пользовательского сценария.
+По умолчанию данные находятся в `data/`:
 
-Важно: не переписывать рабочее ядро проекта без причины. Сначала сохранить работоспособность текущего CLI, потом добавлять упаковку и UX.
+- `purchases.yaml` — покупки schema v2;
+- `participants.yaml` — участники и группы;
+- `categories.yaml` — категории;
+- `settlement_periods.yaml` — закрытые и переоткрытые периоды.
 
----
+Перед перезаписью YAML storage создаёт timestamped `.bak` и выполняет атомарную замену файла.
+Кнопка `Создать backup данных` копирует все YAML в отдельную папку `data/backups/<timestamp>/`.
 
-## 1. Исходное состояние по приложенному отчету
+`Сбросить тестовые данные` требует `RESET_TEST_DATA`, очищает только покупки и периоды, сохраняя
+участников, группы и категории. Удаление открытой покупки требует `DELETE_PURCHASE`; settled-покупки
+удалить нельзя.
 
-По текущему `Implementation Report.md` проект завершен как базовая CLI-реализация:
+## Периоды взаиморасчётов
 
-- проект называется `expense-splitter`;
-- агент: Manus;
-- ветка: `feature/expense-splitter-core`;
-- GitHub remote не настроен;
-- репозиторий создан локально;
-- реализованы модели, YAML-хранение, расчет балансов, минимизация переводов, CLI, Markdown-отчеты и README;
-- доступны команды `init`, `add-purchase`, `list-purchases`, `balances`, `settle`, `report`;
-- тесты по расчетам, settlement и CLI были успешно пройдены.
+Close period не удаляет покупки: они получают `settled: true` и `settlement_period_id` и перестают
+участвовать в scope `open`. Reopen возвращает покупки периода в текущие расчёты.
 
-Текущие ограничения:
+- `open` — только незакрытые покупки;
+- `all` — вся история;
+- конкретный `settlement_period_id` — snapshot выбранного периода.
 
-1. Нет полноценного установщика.
-2. Нет UX launcher для обычного пользователя.
-3. README описывает в основном установку через `pip install -e .`, то есть сценарий разработчика, а не обычного пользователя.
-4. Не описан полный жизненный цикл: установка, первый запуск, обновление, резервное копирование, удаление, восстановление данных.
-5. GitHub remote не настроен, поэтому push/PR невозможны без URL.
-6. Нужно проверить, существует ли реально `.github/workflows/ci.yml`, а не только упоминание в отчете.
-7. Нужно обновить `REPORT.md` и документировать каждый новый этап.
+Reset-test отличается от close: reset физически очищает тестовые покупки и список периодов после
+backup, а close сохраняет историю.
 
----
-
-## 2. Главный результат этапа
-
-После выполнения этапа пользователь должен получить простой сценарий:
-
-### Windows PowerShell, вариант для обычного пользователя
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
-```
-
-Если в текущей сессии PowerShell уже разрешен запуск локальных скриптов, можно использовать короткую форму
-`.\scripts\run-launcher.ps1`. Если появляется ошибка `PSSecurityException` или сообщение, что файл
-`run-launcher.ps1` не имеет цифровой подписи, используйте вариант выше с `-ExecutionPolicy Bypass`.
-
-или после установки:
-
-```powershell
-expense-splitter-launcher
-```
-
-### CLI-вариант
-
-```powershell
-expense-splitter init --with-examples
-expense-splitter add-purchase
-expense-splitter balances
-expense-splitter settle
-expense-splitter report
-```
-
-### Standalone-вариант, если реализован
-
-Пользователь скачивает архив из GitHub Releases, распаковывает и запускает:
-
-```powershell
-ExpenseSplitter.exe
-```
-
-Если standalone exe невозможен в текущей среде, нужно подготовить инфраструктуру сборки через GitHub Actions и явно описать это в README и `REPORT.md`.
-
----
-
-## 3. Обязательные задачи
-
-### 3.1. Проверка состояния проекта
-
-1. Перейти в корень проекта `expense-splitter`.
-2. Выполнить:
-
-```bash
-git status
-git branch --show-current
-git remote -v
-```
-
-3. Проверить структуру проекта.
-4. Проверить наличие файлов:
-   - `pyproject.toml`;
-   - `README.md`;
-   - `REPORT.md`;
-   - `src/expense_splitter/cli.py`;
-   - `src/expense_splitter/__main__.py`;
-   - `.github/workflows/ci.yml`;
-   - `tests/`.
-
-5. Запустить текущие тесты до внесения изменений:
-
-```bash
-python -m pytest
-```
-
-Если тесты не проходят, сначала зафиксировать причину в `REPORT.md`, потом исправить.
-
----
-
-### 3.2. Git и GitHub
-
-1. Создать новую ветку:
-
-```bash
-git checkout -b feature/installer-readme-launcher
-```
-
-Если такая ветка уже есть, переключиться на нее.
-
-2. Если remote отсутствует, не выдумывать URL. Зафиксировать в `REPORT.md`:
-
-```text
-GitHub remote is not configured. Push and PR creation require repository URL from user.
-```
-
-3. Если remote есть, после успешной реализации выполнить:
-
-```bash
-git push -u origin feature/installer-readme-launcher
-```
-
-4. Подготовить текст Pull Request в `docs/PULL_REQUEST_INSTALLER.md`.
-
-5. Не пушить напрямую в `main`.
-
----
-
-### 3.3. Обновление REPORT.md
-
-`REPORT.md` должен обновляться после каждого крупного этапа.
-
-Добавить раздел:
-
-```markdown
-## Stage 2 — Installer, Launcher, README and Distribution
-```
-
-Для каждого подэтапа фиксировать:
-
-- статус;
-- дата/время;
-- измененные файлы;
-- что сделано;
-- какие команды запускались;
-- результат проверок;
-- найденные проблемы;
-- решения;
-- commit hash после коммита, если коммит создан.
-
-Минимальные подэтапы:
-
-1. Pre-check and baseline tests.
-2. Installer design.
-3. Windows PowerShell installer.
-4. Cross-platform install scripts.
-5. UX launcher.
-6. README expansion.
-7. GitHub Actions / release workflow.
-8. Tests and quality checks.
-9. Final delivery notes.
-
-Не писать в чат длинные логи. Подробности заносить в `REPORT.md`.
-
----
-
-## 4. Установщик
-
-### 4.1. Требования к установщику
-
-Нужно реализовать понятный установочный сценарий минимум для Windows PowerShell.
-
-Создать:
-
-```text
-scripts/
-├── install.ps1
-├── run-launcher.ps1
-├── run-cli.ps1
-├── uninstall.ps1
-├── install.sh
-└── run-launcher.sh
-```
-
-Если часть кроссплатформенной поддержки невозможна, реализовать best-effort и документировать ограничения.
-
----
-
-### 4.2. Windows install.ps1
-
-`scripts/install.ps1` должен:
-
-1. Проверить наличие Python.
-2. Проверить версию Python.
-3. Создать виртуальное окружение `.venv`, если его нет.
-4. Установить проект:
-
-```powershell
-python -m pip install --upgrade pip
-pip install -e .
-```
-
-5. Проверить доступность команд:
-
-```powershell
-expense-splitter --help
-```
-
-6. Создать удобные wrapper-скрипты для запуска.
-7. Вывести короткую инструкцию:
-
-```text
-Installation completed.
-Run launcher:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
-
-Run CLI:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 --help
-```
-
-8. Не требовать прав администратора.
-9. Не менять системный PATH без явного параметра пользователя.
-10. Все ошибки выводить понятным текстом.
-
-Дополнительный параметр:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Dev
-```
-
-Устанавливает dev-зависимости:
-
-```powershell
-pip install -e ".[dev]"
-```
-
----
-
-### 4.3. run-launcher.ps1
-
-`scripts/run-launcher.ps1` должен:
-
-1. Активировать `.venv`.
-2. Запустить UX launcher.
-3. Если `.venv` отсутствует, предложить выполнить `install.ps1`.
-
-Пример:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
-```
-
----
-
-### 4.4. run-cli.ps1
-
-`scripts/run-cli.ps1` должен прокидывать аргументы в CLI.
-
-Пример:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 balances
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 settle
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 report
-```
-
----
-
-### 4.5. uninstall.ps1
-
-`scripts/uninstall.ps1` должен:
-
-1. Удалять `.venv`.
-2. Не удалять пользовательские данные по умолчанию.
-3. Предлагать отдельный параметр для удаления локальных данных:
-
-```powershell
-.\scripts\uninstall.ps1 -RemoveData
-```
-
-4. Документировать, какие папки удаляются.
-
----
-
-### 4.6. Linux/macOS install.sh
-
-`scripts/install.sh` должен:
-
-1. Проверять Python 3.
-2. Создавать `.venv`.
-3. Устанавливать проект.
-4. Показывать команды запуска.
-5. Работать без sudo.
-
----
-
-## 5. UX launcher
-
-### 5.1. Назначение
-
-Нужен UX launcher для пользователя, которому неудобно запоминать команды CLI.
-
-Это не обязательно графическое приложение. Достаточно интерактивного терминального меню на `rich`/`typer`, если оно удобно и понятно.
-
----
-
-### 5.2. Обязательные команды launcher
-
-Добавить модуль:
-
-```text
-src/expense_splitter/launcher.py
-```
-
-Добавить entry point в `pyproject.toml`:
-
-```toml
-expense-splitter-launcher = "expense_splitter.launcher:main"
-```
-
-Launcher должен показывать меню:
-
-```text
-Expense Splitter
-
-1. Добавить покупку
-2. Показать покупки
-3. Показать балансы
-4. Показать итоговые переводы
-5. Создать отчет
-6. Открыть папку с данными
-7. Открыть папку с отчетами
-8. Проверить данные
-9. Выход
-```
-
-Требования:
-
-1. Не ломать существующий CLI.
-2. Использовать существующие функции из модулей проекта, а не дублировать бизнес-логику.
-3. Понятно обрабатывать ошибки.
-4. После действия возвращаться в меню.
-5. Для добавления покупки использовать интерактивные вопросы:
-   - название;
-   - сумма;
-   - плательщик;
-   - группа или ручной список участников;
-   - дата;
-   - категория;
-   - комментарий.
-6. Для ручного списка участников принимать имена через запятую.
-7. Для группы показывать доступные группы.
-8. После добавления покупки показывать краткое подтверждение.
-
----
-
-### 5.3. UX launcher smoke test
-
-Добавить тесты или хотя бы smoke-тесты:
-
-1. Проверка импорта `expense_splitter.launcher`.
-2. Проверка существования `main`.
-3. Проверка, что entry point определен в `pyproject.toml`.
-4. Проверка, что launcher не импортирует тяжелые или внешние зависимости без необходимости.
-
----
-
-## 6. Standalone-сборка и GitHub Releases
-
-### 6.1. PyInstaller
-
-Добавить опциональную сборку standalone-приложения через PyInstaller.
-
-Файлы:
-
-```text
-packaging/
-├── expense_splitter.spec
-└── README_PACKAGING.md
-```
-
-Скрипты:
-
-```text
-scripts/
-├── build-windows.ps1
-└── build-unix.sh
-```
-
-`build-windows.ps1` должен:
-
-1. Установить dev/build зависимости.
-2. Запустить PyInstaller.
-3. Сложить результат в `dist/`.
-4. Вывести путь к `ExpenseSplitter.exe`.
-
-Если PyInstaller не подходит или не запускается в текущей среде, не имитировать успех. Зафиксировать ограничение в `REPORT.md`.
-
----
-
-### 6.2. GitHub Actions release workflow
-
-Создать workflow:
-
-```text
-.github/workflows/build-release.yml
-```
-
-Назначение:
-
-1. Сборка на Windows.
-2. Сборка на Linux.
-3. Запуск тестов.
-4. Создание build artifacts.
-5. Подготовка к публикации Release по tag.
-
-Минимальный workflow:
-
-- Python 3.11;
-- install dependencies;
-- `python -m pytest`;
-- PyInstaller build;
-- upload artifact.
-
-Не усложнять. Сначала рабочий workflow, потом красота. Красота без артефакта — это просто театр.
-
----
-
-## 7. Полный README
-
-Текущий README нужно расширить до полноценной пользовательской документации.
-
-Обязательные разделы:
-
-1. Название и назначение проекта.
-2. Для кого проект.
-3. Что умеет приложение.
-4. Быстрый старт для Windows.
-5. Быстрый старт для Linux/macOS.
-6. Установка через PowerShell installer.
-7. Установка через pip/uv для разработчика.
-8. Запуск UX launcher.
-9. Запуск CLI.
-10. Первый сценарий: создать данные, добавить покупку, посмотреть балансы, сформировать переводы.
-11. Описание участников и групп.
-12. Где хранятся данные.
-13. Как сделать резервную копию.
-14. Как восстановить данные.
-15. Как обновить проект.
-16. Как удалить проект.
-17. Как собрать standalone exe.
-18. Как скачать GitHub Release, если релизы настроены.
-19. Все CLI-команды с примерами.
-20. Формат YAML-файлов.
-21. Алгоритм расчета балансов.
-22. Алгоритм минимизации переводов.
-23. Округления и денежные расчеты.
-24. Отчеты.
-25. Тестирование.
-26. Troubleshooting.
-27. FAQ.
-28. Ограничения текущей версии.
-29. Roadmap.
-
-README должен быть на русском языке.
-
----
-
-## 8. Документация для пользователя
-
-Дополнительно создать:
-
-```text
-docs/
-├── USER_GUIDE.md
-├── INSTALLATION.md
-├── PACKAGING.md
-├── TROUBLESHOOTING.md
-└── PULL_REQUEST_INSTALLER.md
-```
-
-Назначение:
-
-- `USER_GUIDE.md` — обычное использование.
-- `INSTALLATION.md` — установка на Windows/Linux/macOS.
-- `PACKAGING.md` — сборка standalone.
-- `TROUBLESHOOTING.md` — типовые ошибки.
-- `PULL_REQUEST_INSTALLER.md` — описание изменений для PR.
-
-Если README получается слишком большим, вынести подробности в docs, а README сделать главным входом.
-
----
-
-## 9. Проверки качества
-
-После реализации запустить:
-
-```bash
-python -m pytest
-python -m ruff check .
-```
-
-Если есть mypy:
-
-```bash
-python -m mypy src
-```
-
-Проверить команды:
-
-```bash
-expense-splitter --help
-expense-splitter-launcher --help
-```
-
-Проверить Windows scripts синтаксически, если среда позволяет:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Dev
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-cli.ps1 --help
-```
-
-Если текущая среда не Windows, зафиксировать в `REPORT.md`, что PowerShell scripts не были полноценно выполнены на Windows, и проверить хотя бы статически.
-
----
-
-## 10. Экономия токенов и режима работы Manus
-
-1. Не пересказывать весь код в чат.
-2. Не вставлять полные логи тестов в чат.
-3. Подробные логи и решения писать в `REPORT.md`.
-4. В чат выводить только краткий статус:
-   - этап;
-   - что сделано;
-   - есть ли блокер.
-5. Не читать полностью большие файлы, если достаточно заголовков, структуры и релевантных фрагментов.
-6. Не переписывать README целиком в чат.
-7. Не генерировать длинные объяснения алгоритмов, если они уже есть в docs.
-8. Не делать косметические изменения вне задачи.
-9. Не запускать тяжелую сборку несколько раз без причины.
-10. Не создавать новые зависимости без необходимости.
-
----
-
-## 11. Возможные улучшения сверх обязательного минимума
-
-Если обязательные задачи выполнены и тесты проходят, можно добавить улучшения:
-
-### 11.1. Проверка данных
-
-Команда:
-
-```bash
-expense-splitter validate
-```
-
-Проверяет:
-
-- неизвестных участников;
-- пустые группы;
-- покупки без участников;
-- отрицательные или нулевые суммы;
-- дубли имен;
-- некорректные даты;
-- расхождение итогов балансов.
-
-### 11.2. Экспорт отчетов
-
-Добавить:
-
-```bash
-expense-splitter report --format markdown
-expense-splitter report --format csv
-expense-splitter report --format xlsx
-```
-
-XLSX делать только если это не ломает простоту проекта.
-
-### 11.3. Импорт из Excel
-
-Если исходный Excel-файл доступен, добавить отдельную команду:
-
-```bash
-expense-splitter import-excel path/to/file.xlsx
-```
-
-На первом этапе можно сделать только каркас и документацию, если структура Excel нестабильна.
-
-### 11.4. История периодов
-
-Добавить поддержку периодов:
-
-```bash
-expense-splitter period create 2026-06
-expense-splitter period use 2026-06
-```
-
-### 11.5. Backup
-
-Добавить:
-
-```bash
-expense-splitter backup
-expense-splitter restore path/to/backup.zip
-```
-
-### 11.6. Улучшение settlement
-
-Добавить проверку:
-
-- сумма долгов равна сумме кредитов;
-- итог после переводов закрывается в ноль;
-- количество транзакций не превышает `debtors + creditors - 1` в типичном случае.
-
----
-
-## 12. Критерии готовности этапа
-
-Этап считается завершенным, если:
-
-1. Есть `scripts/install.ps1`.
-2. Есть `scripts/run-launcher.ps1`.
-3. Есть `scripts/run-cli.ps1`.
-4. Есть `scripts/uninstall.ps1`.
-5. Есть хотя бы best-effort `install.sh`.
-6. Есть `src/expense_splitter/launcher.py`.
-7. В `pyproject.toml` есть entry point для launcher.
-8. README полностью обновлен.
-9. Есть документация в `docs/`.
-10. Есть packaging-инструкция.
-11. Есть GitHub Actions workflow для тестов и, желательно, release build.
-12. `REPORT.md` обновлен по всем этапам.
-13. Тесты проходят.
-14. Старые CLI-команды не сломаны.
-15. Финальный отчет Manus содержит:
-    - список измененных файлов;
-    - команды проверки;
-    - результаты проверки;
-    - commit hashes;
-    - статус GitHub remote/push/PR;
-    - ограничения.
-
----
-
-## 13. Текущее состояние production-ready доработки
-
-Проект ведется в ветке `prod-ready/p0-p1`. Базовые P0-исправления, schema v2 и P1.A-аналитика уже опубликованы в GitHub и проверяются через GitHub Actions.
-
-Основные пользовательские команды:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-launcher.ps1
-expense-splitter analytics --period month --year 2026 --month 6 --format all
-```
-
-Ограничения текущей версии:
-
-- HTML dashboard и XLSX-отчет отложены на P2.
-- Сгенерированные отчеты в `reports/analytics/` не являются исходниками и не коммитятся.
-## GitHub Actions и структура проекта
-
-Целевая production-ready структура локального проекта использует корень
-репозитория как корень Python-пакета. GitHub Actions должны запускаться из `.`
-и устанавливать пакет командой:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-Предыдущая remote-структура с вложенной папкой `expense-splitter/` не считается
-целевой production-ready структурой для локальной P0-доработки.
-
-## Аналитика за период
-
-Expense Splitter создает Markdown, CSV и PNG-отчеты за месяц, квартал или год:
+## Аналитика
 
 ```powershell
 expense-splitter analytics --period month --year 2026 --month 6 --format all
@@ -722,89 +100,90 @@ expense-splitter analytics --period quarter --year 2026 --quarter 2 --format all
 expense-splitter analytics --period year --year 2026 --format all
 ```
 
-Результат сохраняется в `reports/analytics/<year>/<period-id>/`. Доступные значения `--format`: `markdown`, `csv`, `png`, `all`.
+Форматы:
 
-Что создается:
+- `markdown` — `analytics_report.md`;
+- `csv` — таблицы в `tables/`;
+- `png` — графики в `charts/`;
+- `html` — offline `analytics_dashboard.html` с embedded CSS и локальными PNG;
+- `xlsx` — `expense_analytics_<period-id>.xlsx` с таблицами и PNG;
+- `all` — полный комплект плюс `metadata.json`.
 
-- `analytics_report.md`;
-- `metadata.json`;
-- CSV-таблицы в `tables/`;
-- PNG-графики в `charts/`, если за период есть данные.
+Результаты сохраняются в `reports/analytics/<year>/<period-id>/` и не коммитятся.
 
-CSV совместимы с Excel на Windows благодаря кодировке UTF-8 with BOM. Если график не создан из-за отсутствия данных, причина записывается в `tables/warnings.csv`.
-
-Подробнее: `docs/USER_GUIDE.md` и `docs/ANALYTICS.md`.
-
-### Offline HTML-отчёт
-
-Статический HTML без CDN, Plotly и web-server создаётся командой:
+## CLI для продвинутых пользователей
 
 ```powershell
-expense-splitter analytics --period month --year 2026 --month 6 --format html
-```
-
-Файл `reports/analytics/<year>/<period-id>/analytics_dashboard.html` содержит summary cards,
-warnings, таблицы, локальные PNG и ссылки на CSV/Markdown. Формат `all` также включает HTML.
-
-### XLSX-отчёт
-
-Excel-отчёт без зависимости от установленного Microsoft Excel создаётся командой:
-
-```powershell
-expense-splitter analytics --period month --year 2026 --month 6 --format xlsx
-```
-
-Файл `expense_analytics_<period-id>.xlsx` содержит сводку, детальные таблицы, балансы, переводы,
-предупреждения и лист `Charts` с локальными PNG. Формат `all` также включает XLSX.
-## Периоды взаиморасчетов
-
-Expense Splitter поддерживает безопасное закрытие плавающего периода взаиморасчетов без удаления покупок. Закрытые покупки остаются в истории, но по умолчанию исключаются из текущих `balances` и `settle`.
-
-```powershell
-expense-splitter settlement-period preview --from 2026-06-01 --to 2026-06-19
-expense-splitter settlement-period close --from 2026-06-01 --to 2026-06-19 --name "Июнь до 19.06" --confirm CLOSE_PERIOD
-expense-splitter settlement-period list
-expense-splitter settlement-period show settlement_2026_06_19_001
-expense-splitter settlement-period reopen settlement_2026_06_19_001 --confirm REOPEN_PERIOD
-```
-
-Текущий расчет считает только открытые покупки:
-
-```powershell
+expense-splitter --help
+expense-splitter init
+expense-splitter add-purchase --help
+expense-splitter list-purchases
 expense-splitter balances --scope open
 expense-splitter settle --scope open
+expense-splitter settlement-period --help
+expense-splitter analytics --help
 ```
 
-Полный расчет по всей истории доступен через `--scope all`, а snapshot закрытого периода через `--settlement-period`.
+Полный набор параметров показывается через `--help` соответствующей команды.
 
-Подробнее: `docs/SETTLEMENT_PERIODS.md`.
+## Установка и PowerShell-скрипты
 
-## UX desktop GUI
+```powershell
+.\scripts\install.ps1
+.\scripts\install.ps1 -Dev
+.\scripts\run-gui.ps1
+.\scripts\run-gui.ps1 -Help
+.\scripts\run-cli.ps1 --help
+.\scripts\run-launcher.ps1 --help
+```
 
-На вкладке `Покупки` доступны добавление и редактирование открытых покупок. Участников и
-категории можно выбрать галочками либо ввести вручную через запятую. Поле категории — editable
-ComboBox: известную категорию можно выбрать, новую — ввести; в справочник она попадет только
-после подтверждения. Категория отображается в главной таблице.
+При ограниченной Execution Policy используйте
+`powershell -NoProfile -ExecutionPolicy Bypass -File <script>`. Аналоги для Unix находятся в
+`scripts/*.sh`.
 
-Предустановленные категории: `кофе`, `еда`, `безалкогольные напитки`, `алкоголь`, `техника`,
-`аксессуары`, `продукты`, `хозтовары`, `аптека и здоровье`, `развлечения`, `подарки`, `прочее`,
-`без категории`. Пользовательские значения сохраняются в `data/categories.yaml`.
+## Сборка standalone
 
-Редактирование покупки с `settled: true` или `settlement_period_id` заблокировано, чтобы не
-повредить историю закрытого периода.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1 -NoUpx
+```
 
-Кнопка `Сбросить тестовые данные` на вкладке `Данные и обслуживание` после подтверждения
-`RESET_TEST_DATA` создает timestamped `.bak` для `purchases.yaml` и
-`settlement_periods.yaml`, затем очищает только эти два набора. Участники, группы и категории
-сохраняются. Это отличается от закрытия периода: закрытие не удаляет покупки, а исключает их из
-текущих расчетов.
+Ожидаются:
 
-Timestamped `*.bak` — локальные generated artifacts; их не следует добавлять в Git.
+- `dist/expense-splitter.exe` — CLI;
+- `dist/expense-splitter-launcher.exe` — console launcher;
+- `dist/expense-splitter-gui.exe` — desktop GUI без консольного окна (`console=False`).
 
-GUI поддерживает фильтры покупок по статусу, категории, датам и названию, а также сортировку по
-дате, сумме, категории и плательщику. В аналитике можно создать и открыть HTML, XLSX, Markdown или
-папку последнего отчёта. На вкладке текущих расчётов переключается scope `open/all`; закрытые
-покупки не входят в `open`. Для периодов доступны details, preview, close и reopen.
+`build/` и `dist/` являются generated artifacts. Подробнее: [docs/PACKAGING.md](docs/PACKAGING.md).
 
-Ошибочно введённую открытую покупку можно удалить с typed confirm `DELETE_PURCHASE`; перед записью
-storage создаёт `.bak`. Удаление закрытых покупок запрещено, чтобы сохранить историю периода.
+## Troubleshooting
+
+Решения для Execution Policy, запуска GUI, HTML/XLSX, reset-test, категорий, UTF-8 и generated
+artifacts собраны в [docs/Troubleshooting.md](docs/Troubleshooting.md).
+
+## Документация
+
+- [Руководство пользователя](docs/USER_GUIDE.md)
+- [Аналитика](docs/ANALYTICS.md)
+- [Периоды взаиморасчётов](docs/SETTLEMENT_PERIODS.md)
+- [Схема данных](docs/DATA_SCHEMA.md)
+- [Упаковка и standalone](docs/PACKAGING.md)
+- [История production-ready этапов](docs/reports/prod_ready_progress_report.md)
+
+## Development
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest tests -v
+.\.venv\Scripts\python.exe -m compileall -q src tests
+.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py
+.\.venv\Scripts\python.exe -m ruff check src tests
+```
+
+Перед commit проверяйте `git status --short --ignored`; не добавляйте `.venv/`, caches, `reports/`,
+`build/`, `dist/`, `*.egg-info/` и `*.bak`.
+
+## Roadmap
+
+- P2.REL.1 — release quality gate и проверка standalone-сборки;
+- release tag и публикация проверенных Windows artifacts;
+- дальнейшие улучшения UX без изменения стабильного расчётного ядра.

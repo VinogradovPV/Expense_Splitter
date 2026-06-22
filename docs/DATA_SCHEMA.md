@@ -1,91 +1,78 @@
-# Data schema Expense Splitter
+# Схема данных Expense Splitter
 
-Документ фиксирует пользовательскую YAML-схему данных Expense Splitter. Текущая версия схемы для покупок: `v2`.
+Все YAML-файлы сохраняются в UTF-8. Текущая схема покупок — v2.
 
 ## purchases.yaml
 
-Файл содержит корневой объект:
-
 ```yaml
+schema_version: 1
 purchases:
   - id: p1
     date: '2026-06-18'
     purchase_name: Кофе
     amount: '150.00'
     payer: Павел
-    participants:
-      - Павел
-      - Сергей
-    category: Напитки
+    participants: [Павел, Сергей]
+    category: кофе
     comment: null
+    settled: false
+    settlement_period_id: null
 ```
 
-### Поля покупки v2
+`amount` читается как Decimal; дата — `YYYY-MM-DD`. `participants` не может быть пустым. Поле
+`purchase_name` каноническое; пустое значение нормализуется в `н/д`.
 
-| Поле | Тип | Обязательность | Описание |
-|---|---|---|---|
-| `id` | string | да | Идентификатор покупки. |
-| `date` | date/null | да | Дата покупки в формате `YYYY-MM-DD` или `null`. |
-| `purchase_name` | string | да | Наименование покупки. Пустое значение нормализуется в `н/д`. |
-| `amount` | decimal/string | да | Сумма покупки, должна быть больше нуля. |
-| `payer` | string | да | Участник, оплативший покупку. |
-| `participants` | list[string] | да | Участники, между которыми делится покупка. |
-| `category` | string/null | нет | Категория покупки. |
-| `comment` | string/null | нет | Комментарий к покупке. |
+### Совместимость v1
 
-## Совместимость с v1
-
-В v1 для наименования покупки использовалось поле `title`.
-
-Правила совместимости:
-
-- `purchase_name` является каноническим полем v2.
-- `title` поддерживается только как legacy alias при чтении старого YAML.
-- Если в YAML есть `title`, но нет `purchase_name`, приложение возвращает `purchase_name = title`.
-- Если отсутствуют и `title`, и `purchase_name`, приложение возвращает `purchase_name = "н/д"`.
-- Новая запись YAML всегда использует `purchase_name` и не записывает `title`.
+Legacy-поле `title` поддерживается при чтении как alias `purchase_name`, но новые записи используют
+только `purchase_name`. Отсутствующие `settled` и `settlement_period_id` означают открытую покупку.
 
 ## participants.yaml
-
-Схема участников и групп на этапе P1.0 не менялась:
 
 ```yaml
 participants:
   - name: Павел
 groups:
-  - name: 809 кабинет
-    members:
-      - Павел
+  - name: Команда
+    members: [Павел, Сергей]
 ```
 
-## categories.yaml
+Участники и группы хранятся в одном файле и сохраняются при reset-test.
 
-Справочник категорий хранится отдельно и не изменяет схему покупки:
+## categories.yaml
 
 ```yaml
 schema_version: 1
 categories:
   - кофе
   - еда
-  - безалкогольные напитки
-  - алкоголь
-  - техника
-  - аксессуары
-  - продукты
-  - хозтовары
-  - аптека и здоровье
-  - развлечения
-  - подарки
-  - прочее
   - без категории
 ```
 
-Значения непустые и уникальны без учета регистра. GUI допускает несколько категорий у покупки;
-в существующем строковом поле `category` они записываются через запятую. Новое значение попадает
-в справочник только после явного подтверждения пользователя.
+Категории непустые и уникальны без учёта регистра. Новые значения GUI добавляет только после
+подтверждения. Несколько категорий покупки хранятся строкой через запятую для совместимости схемы.
 
-`reset-test` очищает только списки в `purchases.yaml` и `settlement_periods.yaml`. Файлы
-`participants.yaml` (участники и группы) и `categories.yaml` сохраняются.
+## settlement_periods.yaml
 
-Перед reset создаются timestamped backups исходных `purchases.yaml` и
-`settlement_periods.yaml`. Backup обоих файлов завершается до очистки любого live-файла.
+```yaml
+schema_version: 1
+settlement_periods:
+  - id: settlement_2026_06_30_001
+    name: Июнь
+    status: closed
+    date_from: '2026-06-01'
+    date_to: '2026-06-30'
+    purchase_ids: [p1]
+    total_amount: '150.00'
+    settlements: []
+```
+
+Период хранит выбранные покупки и snapshot переводов. Reopen не удаляет запись периода.
+
+## Backups и атомарная запись
+
+Перед заменой существующего YAML создаётся `<name>.yaml.<timestamp>.bak`, затем временный файл
+атомарно заменяет основной. Ручной backup GUI копирует все YAML в `data/backups/<timestamp>/`.
+
+Reset-test требует `RESET_TEST_DATA`, создаёт backups и записывает пустые списки purchases и
+settlement periods. Participants, groups и categories не изменяются.
