@@ -132,7 +132,7 @@ def test_report(temp_data_dir):
     )
     assert result.exit_code == 0
     assert report_path.exists()
-    content = report_path.read_text()
+    content = report_path.read_text(encoding="utf-8")
     assert "# Expense Splitter Report" in content
     assert "Summary of Balances" in content
 

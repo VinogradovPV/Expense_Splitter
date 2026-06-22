@@ -37,7 +37,7 @@ jobs:
       run: expense-splitter --help
 
     - name: Build with PyInstaller (Linux)
-      run: ./scripts/build-unix.sh
+      run: bash ./scripts/build-unix.sh
 
     - name: Upload Linux Artifacts
       uses: actions/upload-artifact@v4
