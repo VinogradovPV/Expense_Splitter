@@ -135,6 +135,8 @@ def test_report(temp_data_dir):
     content = report_path.read_text(encoding="utf-8")
     assert "# Expense Splitter Report" in content
     assert "Summary of Balances" in content
+    assert "Кофе в офис" in content
+    assert "Павел" in content
 
 
 def test_analytics_command_generates_all_outputs(temp_data_dir, tmp_path):

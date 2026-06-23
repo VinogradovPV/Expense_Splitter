@@ -1,3 +1,23 @@
+## P2.REL.1-WIN-ENCODING — Windows/Linux CI UTF-8 hotfix
+
+- Причина: Windows `Build Release` падал в `tests/test_cli.py::test_report` на
+  `UnicodeDecodeError` при чтении Markdown-отчета через системную кодировку. Аналогичный риск
+  возможен на Linux runner при не-UTF-8 locale, если текстовые файлы читаются без явного encoding.
+- Измененные файлы: `tests/test_cli.py`,
+  `docs/reports/prod_ready_progress_report.md`.
+- Проверки:
+  - `pytest tests\test_cli.py::test_report -v` — OK, `1 passed`.
+  - `pytest tests -v` — OK, `100 passed`.
+  - `compileall -q src tests` — OK.
+  - `scripts\qa\check_text_encoding.py` — OK.
+  - `ruff check src tests` — OK.
+  - `git diff --check` — OK; есть только предупреждение Git о будущей CRLF-нормализации
+    измененных `.md/.py` файлов.
+  - `Select-String`/`rg` по `.read_text()`/`.write_text()` — оставшиеся вызовы используют
+    `encoding="utf-8"` или CSV policy `encoding="utf-8-sig"`.
+- GitHub Actions: pending; будет проверено после push.
+- Commit: pending.
+
 ## P2.GUI.1 — Desktop GUI launcher foundation
 
 Дата: 2026-06-19
