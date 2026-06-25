@@ -1,3 +1,36 @@
+## P2.GUI.5 — Directory management for participants and categories
+
+Дата: 2026-06-25
+Статус: реализовано локально; quality gate пройден, commit/push и GitHub Actions выполняются после фиксации.
+
+### Реализовано
+
+- Новая вкладка GUI `Справочники` с двумя таблицами: `Участники` и `Категории`.
+- Для участников показаны имя, статус, использование в открытых покупках, использование всего и группы.
+- Для категорий показаны название, статус, использование в открытых покупках и использование всего.
+- Добавление, переименование, архивирование, удаление, обновление и переключатель `Показать архивные`.
+- Backward-compatible схема `active/archived` для `participants.yaml` и `categories.yaml`.
+- Переименование участника каскадно обновляет `participants.yaml`, группы, покупки и snapshots settlement periods.
+- Переименование категории обновляет `categories.yaml` и `purchase.category`, включая строки с несколькими категориями через запятую.
+- Удаление используемого участника заблокировано с рекомендацией архивировать.
+- Удаление используемой категории требует typed confirm `DELETE_CATEGORY_USAGE` и очищает совпавшую категорию из покупок.
+- Архивные участники и категории скрываются из новых покупок, но остаются в истории, расчетах и отчетах.
+- Документация обновлена в README, USER_GUIDE, DATA_SCHEMA и Troubleshooting.
+
+### Проверки
+
+- `python -m pip install -e ".[dev]"` — OK; сохраняется прежнее warning: Typer 0.26.7 не объявляет extra `all`.
+- `pytest tests\test_categories.py -v` — `7 passed`.
+- `pytest tests\test_participants.py -v` — `4 passed`.
+- `pytest tests\test_gui_actions.py -v` — `13 passed`.
+- `pytest tests -v` — `120 passed`.
+- `compileall -q src tests` — OK.
+- `scripts\qa\check_text_encoding.py` — OK.
+- `ruff check src tests` — OK.
+- `git diff --check` — OK; только предупреждения Git о будущей CRLF-нормализации.
+- `expense-splitter-gui.exe --help` — OK.
+- `scripts\run-gui.ps1 -Help` — OK.
+
 ## P2.GUI.4 / P2.RPT.1 — Current settlement state report
 
 Дата: 2026-06-25

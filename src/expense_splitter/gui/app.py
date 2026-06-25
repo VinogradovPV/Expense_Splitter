@@ -36,6 +36,7 @@ class ExpenseSplitterGui:
         self._build_balances_tab()
         self._build_periods_tab()
         self._build_analytics_tab()
+        self._build_directories_tab()
         self._build_data_tab()
         self._build_help_tab()
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").pack(
@@ -88,9 +89,12 @@ class ExpenseSplitterGui:
                     row=1, column=column, padx=3
                 )
             else:
-                ttk.Combobox(
+                combo = ttk.Combobox(
                     filters, textvariable=variable, values=values, state="readonly", width=16
-                ).grid(row=1, column=column, padx=3)
+                )
+                combo.grid(row=1, column=column, padx=3)
+                if variable is self.purchase_category_filter_var:
+                    self.purchase_category_filter_combo = combo
         ttk.Button(filters, text="Применить", command=self.refresh_purchases).grid(
             row=1, column=5, padx=6
         )
@@ -235,6 +239,95 @@ class ExpenseSplitterGui:
             row=len(rows) + 3, column=0, columnspan=2, sticky="w", padx=4, pady=8
         )
 
+    def _build_directories_tab(self) -> None:
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="Справочники")
+        pane = ttk.PanedWindow(tab, orient="horizontal")
+        pane.pack(fill="both", expand=True, padx=6, pady=6)
+
+        participants_frame = ttk.LabelFrame(pane, text="Участники")
+        categories_frame = ttk.LabelFrame(pane, text="Категории")
+        pane.add(participants_frame, weight=1)
+        pane.add(categories_frame, weight=1)
+
+        participants_toolbar = ttk.Frame(participants_frame)
+        participants_toolbar.pack(fill="x", padx=4, pady=4)
+        ttk.Button(
+            participants_toolbar,
+            text="Добавить участника",
+            command=self.add_directory_participant,
+        ).pack(side="left")
+        ttk.Button(
+            participants_toolbar,
+            text="Переименовать участника",
+            command=self.rename_directory_participant,
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            participants_toolbar,
+            text="Архивировать участника",
+            command=self.archive_directory_participant,
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            participants_toolbar,
+            text="Удалить участника",
+            command=self.delete_directory_participant,
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            participants_toolbar, text="Обновить", command=self.refresh_directories
+        ).pack(side="left", padx=4)
+        self.show_archived_participants_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            participants_toolbar,
+            text="Показать архивные",
+            variable=self.show_archived_participants_var,
+            command=self.refresh_directories,
+        ).pack(side="left", padx=8)
+
+        self.participants_directory_tree = make_tree(
+            participants_frame,
+            ("Имя", "Статус", "Открытые покупки", "Всего покупок", "Группы"),
+        )
+        self.participants_directory_tree.pack(fill="both", expand=True, padx=4, pady=4)
+
+        categories_toolbar = ttk.Frame(categories_frame)
+        categories_toolbar.pack(fill="x", padx=4, pady=4)
+        ttk.Button(
+            categories_toolbar,
+            text="Добавить категорию",
+            command=self.add_directory_category,
+        ).pack(side="left")
+        ttk.Button(
+            categories_toolbar,
+            text="Переименовать категорию",
+            command=self.rename_directory_category,
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            categories_toolbar,
+            text="Архивировать категорию",
+            command=self.archive_directory_category,
+        ).pack(side="left", padx=4)
+        ttk.Button(
+            categories_toolbar,
+            text="Удалить категорию",
+            command=self.delete_directory_category,
+        ).pack(side="left", padx=4)
+        ttk.Button(categories_toolbar, text="Обновить", command=self.refresh_directories).pack(
+            side="left", padx=4
+        )
+        self.show_archived_categories_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            categories_toolbar,
+            text="Показать архивные",
+            variable=self.show_archived_categories_var,
+            command=self.refresh_directories,
+        ).pack(side="left", padx=8)
+
+        self.categories_directory_tree = make_tree(
+            categories_frame,
+            ("Категория", "Статус", "Открытые покупки", "Всего покупок"),
+        )
+        self.categories_directory_tree.pack(fill="both", expand=True, padx=4, pady=4)
+
     def _build_data_tab(self) -> None:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Данные и обслуживание")
@@ -300,9 +393,14 @@ class ExpenseSplitterGui:
         self.refresh_purchases()
         self.refresh_calculations()
         self.refresh_periods()
+        self.refresh_directories()
 
     def refresh_purchases(self) -> None:
         def action():
+            if hasattr(self, "purchase_category_filter_combo"):
+                self.purchase_category_filter_combo.configure(
+                    values=("", *actions.category_names(self.state))
+                )
             clear_tree(self.purchases_tree)
             purchases = actions.filter_and_sort_purchases(
                 actions.list_purchases(self.state),
@@ -509,6 +607,210 @@ class ExpenseSplitterGui:
                 )
 
         self.run_safely(action, "Периоды обновлены")
+
+    def refresh_directories(self) -> None:
+        if not hasattr(self, "participants_directory_tree"):
+            return
+
+        def action():
+            clear_tree(self.participants_directory_tree)
+            for row in actions.participant_directory_rows(
+                self.state,
+                include_archived=self.show_archived_participants_var.get(),
+            ):
+                self.participants_directory_tree.insert(
+                    "",
+                    "end",
+                    iid=row.name,
+                    values=(
+                        row.name,
+                        row.status,
+                        row.open_count,
+                        row.total_count,
+                        ", ".join(row.groups),
+                    ),
+                )
+            clear_tree(self.categories_directory_tree)
+            for row in actions.category_directory_rows(
+                self.state,
+                include_archived=self.show_archived_categories_var.get(),
+            ):
+                self.categories_directory_tree.insert(
+                    "",
+                    "end",
+                    iid=row.name,
+                    values=(row.name, row.status, row.open_count, row.total_count),
+                )
+
+        self.run_safely(action, "Справочники обновлены")
+
+    def _selected_directory_participant(self) -> str | None:
+        selected = self.participants_directory_tree.selection()
+        if not selected:
+            messagebox.showwarning("Справочники", "Выберите участника.", parent=self.root)
+            return None
+        return selected[0]
+
+    def _selected_directory_category(self) -> str | None:
+        selected = self.categories_directory_tree.selection()
+        if not selected:
+            messagebox.showwarning("Справочники", "Выберите категорию.", parent=self.root)
+            return None
+        return selected[0]
+
+    def _refresh_after_directory_change(self) -> None:
+        self.refresh_directories()
+        self.refresh_purchases()
+        self.refresh_calculations()
+
+    def add_directory_participant(self) -> None:
+        name = simpledialog.askstring("Добавить участника", "Имя участника:", parent=self.root)
+        if name is None:
+            return
+        result = self.run_safely(
+            lambda: actions.add_participant(self.state, name),
+            "Участник добавлен",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def rename_directory_participant(self) -> None:
+        old_name = self._selected_directory_participant()
+        if old_name is None:
+            return
+        new_name = simpledialog.askstring(
+            "Переименовать участника",
+            "Новое имя участника:",
+            initialvalue=old_name,
+            parent=self.root,
+        )
+        if new_name is None:
+            return
+        if not messagebox.askyesno(
+            "Подтверждение",
+            "Будут обновлены участник, группы, покупки и snapshots периодов. Продолжить?",
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.rename_participant(self.state, old_name, new_name),
+            "Участник переименован",
+        )
+        if result:
+            self._refresh_after_directory_change()
+            self.refresh_periods()
+
+    def archive_directory_participant(self) -> None:
+        name = self._selected_directory_participant()
+        if name is None:
+            return
+        if not messagebox.askyesno(
+            "Архивировать участника",
+            f'Архивировать участника "{name}"? Он исчезнет из новых покупок.',
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.archive_participant(self.state, name),
+            "Участник архивирован",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def delete_directory_participant(self) -> None:
+        name = self._selected_directory_participant()
+        if name is None:
+            return
+        if not messagebox.askyesno(
+            "Удалить участника",
+            f'Удалить участника "{name}"? Используемый участник не будет удален.',
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.delete_participant(self.state, name),
+            "Участник удален",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def add_directory_category(self) -> None:
+        name = simpledialog.askstring("Добавить категорию", "Категория:", parent=self.root)
+        if name is None:
+            return
+        result = self.run_safely(
+            lambda: actions.add_category(self.state, name),
+            "Категория добавлена",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def rename_directory_category(self) -> None:
+        old_name = self._selected_directory_category()
+        if old_name is None:
+            return
+        new_name = simpledialog.askstring(
+            "Переименовать категорию",
+            "Новая категория:",
+            initialvalue=old_name,
+            parent=self.root,
+        )
+        if new_name is None:
+            return
+        if not messagebox.askyesno(
+            "Подтверждение",
+            "Категория будет обновлена во всех покупках, включая строки с несколькими "
+            "категориями. Продолжить?",
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.rename_category(self.state, old_name, new_name),
+            "Категория переименована",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def archive_directory_category(self) -> None:
+        name = self._selected_directory_category()
+        if name is None:
+            return
+        if not messagebox.askyesno(
+            "Архивировать категорию",
+            f'Архивировать категорию "{name}"? Она исчезнет из новых покупок.',
+            parent=self.root,
+        ):
+            return
+        result = self.run_safely(
+            lambda: actions.archive_category(self.state, name),
+            "Категория архивирована",
+        )
+        if result:
+            self._refresh_after_directory_change()
+
+    def delete_directory_category(self) -> None:
+        name = self._selected_directory_category()
+        if name is None:
+            return
+        confirm = ""
+        if not messagebox.askyesno(
+            "Удалить категорию",
+            f'Удалить категорию "{name}"? Если она используется, потребуется typed confirm.',
+            parent=self.root,
+        ):
+            return
+        confirm = simpledialog.askstring(
+            "Typed confirm",
+            f"Если категория используется и нужно очистить ее в покупках, введите "
+            f"{actions.DELETE_CATEGORY_USAGE_CONFIRM}:",
+            parent=self.root,
+        ) or ""
+        result = self.run_safely(
+            lambda: actions.delete_category(self.state, name, confirm),
+            "Категория удалена",
+        )
+        if result:
+            self._refresh_after_directory_change()
 
     def _selected_period(self):
         selected = self.periods_tree.selection()

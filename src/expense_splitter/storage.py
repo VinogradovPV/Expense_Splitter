@@ -11,6 +11,7 @@ import yaml
 
 from expense_splitter.models import (
     DEFAULT_PURCHASE_NAME,
+    CategoryEntry,
     Group,
     Participant,
     Purchase,
@@ -113,13 +114,27 @@ def _save_yaml_data(file_path: Path, data: dict, *, create_backup: bool = True) 
             temp_path.unlink(missing_ok=True)
         raise StorageError(f"Cannot write {file_path}: {exc}", file_path) from exc
 
-def load_participants(file_path: Path) -> List[Participant]:
+def load_participants(file_path: Path, include_archived: bool = True) -> List[Participant]:
     data = _load_yaml_data(file_path)
-    return [Participant(**p) for p in data.get('participants', [])]
+    participants = [_load_participant(item) for item in data.get('participants', [])]
+    if include_archived:
+        return participants
+    return [participant for participant in participants if participant.status == "active"]
+
+
+def _load_participant(item) -> Participant:
+    if isinstance(item, str):
+        return Participant(name=item)
+    if not isinstance(item, dict):
+        return Participant(name=str(item))
+    return Participant(name=item.get("name", ""), status=item.get("status", "active"))
 
 def save_participants(file_path: Path, participants: List[Participant]):
     data = _load_yaml_data(file_path)
-    data['participants'] = [p.__dict__ for p in participants]
+    data['participants'] = [
+        {"name": participant.name, "status": participant.status}
+        for participant in participants
+    ]
     _save_yaml_data(file_path, data)
 
 def load_groups(file_path: Path) -> List[Group]:
@@ -175,30 +190,59 @@ def save_purchases(file_path: Path, purchases: List[Purchase]):
     return _save_yaml_data(file_path, data)
 
 
-def load_categories(file_path: Path) -> list[str]:
+def load_categories(file_path: Path, include_archived: bool = False) -> list[str]:
+    entries = load_category_entries(file_path)
+    if not include_archived:
+        entries = [entry for entry in entries if entry.status == "active"]
+    return [entry.name for entry in entries]
+
+
+def load_category_entries(file_path: Path) -> list[CategoryEntry]:
     data = _load_yaml_data(file_path)
     values = data.get('categories', [])
     if not isinstance(values, list):
         raise StorageError(f"Invalid categories in {file_path}: expected a list.", file_path)
-    return _unique_categories(values)
+    return _unique_category_entries(values)
 
 
-def _unique_categories(categories) -> list[str]:
+def _unique_category_entries(categories) -> list[CategoryEntry]:
     result = []
     seen = set()
     for value in categories:
-        category = str(value).strip()
-        key = category.casefold()
-        if category and key not in seen:
-            result.append(category)
+        entry = _load_category_entry(value)
+        key = entry.name.casefold()
+        if entry.name and key not in seen:
+            result.append(entry)
             seen.add(key)
     return result
 
 
+def _load_category_entry(value) -> CategoryEntry:
+    if isinstance(value, CategoryEntry):
+        return value
+    if isinstance(value, dict):
+        return CategoryEntry(
+            name=value.get("name", ""),
+            status=value.get("status", "active"),
+        )
+    return CategoryEntry(name=str(value))
+
+
+def _unique_categories(categories) -> list[str]:
+    return [entry.name for entry in _unique_category_entries(categories)]
+
+
 def save_categories(file_path: Path, categories: list[str]):
+    save_category_entries(file_path, [CategoryEntry(name=name) for name in categories])
+
+
+def save_category_entries(file_path: Path, categories: list[CategoryEntry]):
     data = {
         'schema_version': SCHEMA_VERSION,
-        'categories': _unique_categories(categories),
+        'categories': [
+            {"name": entry.name, "status": entry.status}
+            for entry in _unique_category_entries(categories)
+        ],
     }
     return _save_yaml_data(file_path, data)
 

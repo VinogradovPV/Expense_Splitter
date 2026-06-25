@@ -2,7 +2,11 @@ from datetime import date
 from decimal import Decimal
 
 from expense_splitter.analytics import build_analytics_dataset, parse_period
-from expense_splitter.analytics_charts import CHART_FILENAMES, generate_analytics_charts
+from expense_splitter.analytics_charts import (
+    CHART_FILENAMES,
+    _format_chart_value,
+    generate_analytics_charts,
+)
 from expense_splitter.models import Participant, Purchase
 
 
@@ -40,3 +44,8 @@ def test_empty_dataset_returns_warnings_instead_of_failing(tmp_path):
     assert paths == []
     assert len(warnings) == len(CHART_FILENAMES)
     assert {warning["warning_type"] for warning in warnings} == {"chart_no_data"}
+
+
+def test_chart_data_labels_use_readable_money_format():
+    assert _format_chart_value(1200.5) == "1 200.50"
+    assert _format_chart_value(-25) == "-25.00"

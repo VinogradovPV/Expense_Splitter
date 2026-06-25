@@ -196,3 +196,39 @@ def test_reset_requires_exact_typed_confirmation(tmp_path):
     state = make_state(tmp_path)
     with pytest.raises(ValueError, match="RESET_TEST_DATA"):
         actions.reset_test_data(state, "reset")
+
+
+def test_directory_actions_manage_participants_and_hide_archived_from_new_purchases(tmp_path):
+    state = make_state(tmp_path)
+
+    actions.add_participant(state, "Alice")
+    actions.archive_participant(state, "Alice")
+
+    assert "Alice" not in actions.participant_names(state)
+    assert "Alice" in actions.all_participant_names(state)
+    rows = actions.participant_directory_rows(state, include_archived=True)
+    assert any(row.name == "Alice" and row.status == "archived" for row in rows)
+
+
+def test_directory_actions_rename_category_and_update_purchase_filters(tmp_path):
+    state = make_state(tmp_path)
+    actions.add_category(state, "Food")
+    names = actions.participant_names(state)
+    purchase = actions.add_purchase(
+        state,
+        "Lunch",
+        "100",
+        names[0],
+        names[:2],
+        "2026-06-25",
+        "Food",
+    )
+
+    actions.rename_category(state, "Food", "Meals")
+
+    assert "Meals" in actions.category_names(state)
+    assert "Food" not in actions.category_names(state)
+    assert load_purchases(state.data_dir / "purchases.yaml")[0].category == "Meals"
+    rows = actions.category_directory_rows(state)
+    assert any(row.name == "Meals" and row.total_count == 1 for row in rows)
+    assert purchase.id == load_purchases(state.data_dir / "purchases.yaml")[0].id

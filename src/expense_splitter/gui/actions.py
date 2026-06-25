@@ -14,6 +14,37 @@ from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.calculator import calculate_balances
 from expense_splitter.current_report import build_current_report_dataset, generate_current_report
 from expense_splitter.defaults import DEFAULT_CATEGORIES, DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
+from expense_splitter.directories import (
+    DELETE_CATEGORY_USAGE_CONFIRM as DIRECTORY_DELETE_CATEGORY_USAGE_CONFIRM,
+)
+from expense_splitter.directories import (
+    add_category as directory_add_category,
+)
+from expense_splitter.directories import (
+    add_participant as directory_add_participant,
+)
+from expense_splitter.directories import (
+    archive_category as directory_archive_category,
+)
+from expense_splitter.directories import (
+    archive_participant as directory_archive_participant,
+)
+from expense_splitter.directories import (
+    delete_category as directory_delete_category,
+)
+from expense_splitter.directories import (
+    delete_participant as directory_delete_participant,
+)
+from expense_splitter.directories import (
+    list_category_rows,
+    list_participant_rows,
+)
+from expense_splitter.directories import (
+    rename_category as directory_rename_category,
+)
+from expense_splitter.directories import (
+    rename_participant as directory_rename_participant,
+)
 from expense_splitter.gui.state import GuiState
 from expense_splitter.models import Purchase
 from expense_splitter.settlement import calculate_settlements
@@ -32,7 +63,6 @@ from expense_splitter.storage import (
     load_participants,
     load_purchases,
     load_settlement_periods,
-    save_categories,
     save_purchases,
     save_settlement_periods,
 )
@@ -40,12 +70,26 @@ from expense_splitter.storage import (
     reset_test_data as storage_reset_test_data,
 )
 
+DELETE_CATEGORY_USAGE_CONFIRM = DIRECTORY_DELETE_CATEGORY_USAGE_CONFIRM
+
 
 def ensure_data(state: GuiState) -> None:
     initialize_data_files(state.data_dir, DEFAULT_PARTICIPANTS, DEFAULT_GROUPS)
 
 
 def participant_names(state: GuiState) -> list[str]:
+    ensure_data(state)
+    names = [
+        participant.name
+        for participant in load_participants(
+            state.data_dir / "participants.yaml",
+            include_archived=False,
+        )
+    ]
+    return names or [participant.name for participant in DEFAULT_PARTICIPANTS]
+
+
+def all_participant_names(state: GuiState) -> list[str]:
     ensure_data(state)
     names = [
         participant.name for participant in load_participants(state.data_dir / "participants.yaml")
@@ -129,14 +173,53 @@ def category_names(state: GuiState) -> list[str]:
 
 
 def add_category(state: GuiState, category: str) -> list[str]:
-    value = category.strip()
-    if not value:
-        raise ValueError("Категория не может быть пустой.")
-    categories = category_names(state)
-    if value.casefold() not in {item.casefold() for item in categories}:
-        categories.append(value)
-        save_categories(state.data_dir / "categories.yaml", categories)
-    return categories
+    directory_add_category(state.data_dir, category)
+    return category_names(state)
+
+
+def participant_directory_rows(state: GuiState, include_archived: bool = False):
+    ensure_data(state)
+    return list_participant_rows(state.data_dir, include_archived=include_archived)
+
+
+def category_directory_rows(state: GuiState, include_archived: bool = False):
+    ensure_data(state)
+    return list_category_rows(state.data_dir, include_archived=include_archived)
+
+
+def add_participant(state: GuiState, name: str):
+    ensure_data(state)
+    return directory_add_participant(state.data_dir, name)
+
+
+def rename_participant(state: GuiState, old_name: str, new_name: str):
+    ensure_data(state)
+    return directory_rename_participant(state.data_dir, old_name, new_name)
+
+
+def archive_participant(state: GuiState, name: str):
+    ensure_data(state)
+    return directory_archive_participant(state.data_dir, name)
+
+
+def delete_participant(state: GuiState, name: str):
+    ensure_data(state)
+    return directory_delete_participant(state.data_dir, name)
+
+
+def rename_category(state: GuiState, old_name: str, new_name: str):
+    ensure_data(state)
+    return directory_rename_category(state.data_dir, old_name, new_name)
+
+
+def archive_category(state: GuiState, name: str):
+    ensure_data(state)
+    return directory_archive_category(state.data_dir, name)
+
+
+def delete_category(state: GuiState, name: str, usage_confirm: str = ""):
+    ensure_data(state)
+    return directory_delete_category(state.data_dir, name, usage_confirm)
 
 
 def add_purchase(
@@ -248,7 +331,7 @@ def reset_test_data(state: GuiState, confirm: str):
 
 
 def balances(state: GuiState, scope: str = "open"):
-    names = participant_names(state)
+    names = all_participant_names(state)
     purchases = filter_purchases_by_settlement_scope(list_purchases(state), scope=scope)
     return calculate_balances(purchases, names)
 
@@ -273,7 +356,7 @@ def settlement_periods(state: GuiState):
 def preview_close_period(state: GuiState, date_from: str, date_to: str):
     return preview_settlement_period(
         list_purchases(state),
-        participant_names(state),
+        all_participant_names(state),
         parse_period_date(date_from),
         parse_period_date(date_to),
     )
@@ -285,7 +368,7 @@ def close_period(state: GuiState, date_from: str, date_to: str, name: str):
     period = close_settlement_period(
         purchases,
         periods,
-        participant_names(state),
+        all_participant_names(state),
         parse_period_date(date_from),
         parse_period_date(date_to),
         name,

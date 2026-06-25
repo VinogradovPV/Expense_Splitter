@@ -72,15 +72,36 @@ def _save_barh(
     height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
     fig, ax = plt.subplots(figsize=(10, height))
     positions = range(len(labels))
-    ax.barh(positions, values, color=colors)
+    bars = ax.barh(positions, values, color=colors)
     ax.set_yticks(list(positions), labels=labels)
     ax.invert_yaxis()
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.grid(axis="x", alpha=0.2)
+    _pad_value_axis(ax, values)
+    ax.bar_label(
+        bars,
+        labels=[_format_chart_value(value) for value in values],
+        padding=4,
+        fontsize=9,
+    )
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def _pad_value_axis(ax, values: list[float]) -> None:
+    if not values:
+        return
+    low = min(0.0, min(values))
+    high = max(0.0, max(values))
+    span = high - low or max(abs(high), abs(low), 1.0)
+    pad = span * 0.18
+    ax.set_xlim(low - pad, high + pad)
+
+
+def _format_chart_value(value: float) -> str:
+    return f"{value:,.2f}".replace(",", " ")
 
 
 def _spending_by_category(dataset: AnalyticsDataset, path: Path) -> None:
@@ -153,10 +174,20 @@ def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(labels, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
     ax.scatter(labels, values, color=[period_colors[label] for label in labels], zorder=3)
+    for label, value in zip(labels, values):
+        ax.annotate(
+            _format_chart_value(value),
+            (label, value),
+            textcoords="offset points",
+            xytext=(0, 8),
+            ha="center",
+            fontsize=9,
+        )
     ax.set_title("Динамика расходов за период")
     ax.set_xlabel("Дата" if dataset.period_spec.period == "month" else "Месяц")
     ax.set_ylabel("Сумма")
     ax.grid(alpha=0.2)
+    ax.margins(y=0.2)
     ax.tick_params(axis="x", rotation=45)
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")

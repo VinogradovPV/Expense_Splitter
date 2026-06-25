@@ -8,11 +8,28 @@ DEFAULT_PURCHASE_NAME = "н/д"
 @dataclass
 class Participant:
     name: str
+    status: str = "active"
+
+    def __post_init__(self):
+        self.name = str(self.name).strip()
+        if self.status not in {"active", "archived"}:
+            raise ValueError("Participant status must be 'active' or 'archived'.")
 
 @dataclass
 class Group:
     name: str
     members: List[str]
+
+
+@dataclass
+class CategoryEntry:
+    name: str
+    status: str = "active"
+
+    def __post_init__(self):
+        self.name = str(self.name).strip()
+        if self.status not in {"active", "archived"}:
+            raise ValueError("Category status must be 'active' or 'archived'.")
 
 @dataclass
 class Purchase:

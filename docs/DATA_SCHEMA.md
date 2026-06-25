@@ -76,3 +76,34 @@ settlement_periods:
 
 Reset-test требует `RESET_TEST_DATA`, создаёт backups и записывает пустые списки purchases и
 settlement periods. Participants, groups и categories не изменяются.
+
+## Справочники active/archived
+
+Новые сохранения участников поддерживают поле `status`:
+
+```yaml
+participants:
+  - name: Павел
+    status: active
+  - name: Старый участник
+    status: archived
+```
+
+Старые записи без `status` читаются как `active`. Архивные участники не показываются в новых
+покупках, но остаются в истории и расчетах.
+
+Новые сохранения категорий поддерживают расширенный формат:
+
+```yaml
+schema_version: 1
+categories:
+  - name: кофе
+    status: active
+  - name: старая категория
+    status: archived
+```
+
+Старый формат `categories: [кофе, еда]` читается как список активных категорий. `load_categories()`
+по умолчанию возвращает только активные категории; `load_category_entries()` возвращает записи со
+статусами. Если покупка хранит несколько категорий строкой через запятую, переименование меняет
+только совпавший элемент строки.
