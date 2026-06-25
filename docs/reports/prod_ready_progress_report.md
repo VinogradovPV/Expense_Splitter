@@ -1,3 +1,41 @@
+## P2.GUI.4 / P2.RPT.1 — Current settlement state report
+
+Дата: 2026-06-25
+Статус: реализовано локально; quality gate пройден, commit/push и GitHub Actions выполняются
+после фиксации изменений.
+
+### Реализовано
+
+- CLI-команда `expense-splitter current-report` с default `--scope open --format all`.
+- Поддержка `--scope open|all` и форматов `markdown`, `csv`, `png`, `html`, `xlsx`, `all`.
+- Snapshot-каталог `reports/current_state/<scope>_<YYYY-MM-DD_HH-MM-SS>/`.
+- Markdown, offline HTML, XLSX, `metadata.json`, CSV-таблицы и PNG-графики текущего состояния.
+- GUI-кнопки на вкладке `Текущие расчеты`: создать отчет, открыть HTML, открыть XLSX, открыть
+  папку отчета.
+- Переиспользование существующих `calculate_balances`, `calculate_settlements` и open/all scope
+  filtering без изменения логики закрытия периодов.
+- Документация в README, USER_GUIDE, ANALYTICS, SETTLEMENT_PERIODS и Troubleshooting.
+
+### Ограничения
+
+Settlement-period-specific вариант `current-report --settlement-period <id>` не включен в этот
+этап, чтобы не расширять контракт закрытых snapshot сверх текущей задачи. Рекомендуемый следующий
+этап: P2.RPT.2 — отчет по конкретному settlement period.
+
+### Проверки
+
+- `python -m pip install -e ".[dev]"` — OK; сохраняется прежнее warning: Typer 0.26.7 не
+  объявляет extra `all`.
+- `pytest tests\test_current_report.py -v` — `6 passed`.
+- `pytest tests -v` — `109 passed`.
+- `compileall -q src tests` — OK.
+- `scripts\qa\check_text_encoding.py` — OK.
+- `ruff check src tests` — OK.
+- `git diff --check` — OK; только предупреждения Git о будущей CRLF-нормализации.
+- CLI smoke `current-report --scope open --format all`, `--scope all --format all`,
+  `--scope open --format html`, `--scope open --format xlsx` — OK.
+- GUI smoke `expense-splitter-gui.exe --help` и `scripts\run-gui.ps1 -Help` — OK.
+
 ## P2.REL.1-WIN-ENCODING — Windows/Linux CI UTF-8 hotfix
 
 - Причина: Windows `Build Release` падал в `tests/test_cli.py::test_report` на

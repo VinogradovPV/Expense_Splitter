@@ -25,6 +25,7 @@ class ExpenseSplitterGui:
         self.root.title("Expense Splitter")
         self.root.geometry("1100x720")
         self.status_var = tk.StringVar(value="Готово")
+        self.last_current_report_dir: Path | None = None
         self._build()
         self.refresh_all()
 
@@ -124,6 +125,22 @@ class ExpenseSplitterGui:
             toolbar,
             text="Показать все с историей",
             command=lambda: self.set_calculation_scope("all"),
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
+            text="Создать отчет текущих взаиморасчетов",
+            command=self.generate_current_state_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(toolbar, text="Открыть HTML", command=self.open_current_html_report).pack(
+            side="left", padx=6
+        )
+        ttk.Button(toolbar, text="Открыть XLSX", command=self.open_current_xlsx_report).pack(
+            side="left", padx=6
+        )
+        ttk.Button(
+            toolbar,
+            text="Открыть папку отчета",
+            command=self.open_current_report_folder,
         ).pack(side="left", padx=6)
         self.scope_label_var = tk.StringVar()
         ttk.Label(tab, textvariable=self.scope_label_var, wraplength=900).pack(anchor="w", padx=6)
@@ -426,6 +443,51 @@ class ExpenseSplitterGui:
                 )
 
         self.run_safely(action, "Текущие расчеты обновлены")
+
+    def generate_current_state_report(self) -> None:
+        report_dir = self.run_safely(
+            lambda: actions.generate_current_state_report(self.state),
+            None,
+        )
+        if report_dir:
+            self.last_current_report_dir = report_dir
+            message = f"Отчет текущих взаиморасчетов создан: {report_dir}"
+            self.status_var.set(message)
+            messagebox.showinfo("Отчет создан", f"Папка отчета:\n{report_dir}", parent=self.root)
+
+    def _require_current_report_dir(self) -> Path | None:
+        if self.last_current_report_dir is None:
+            messagebox.showerror(
+                "Отчет не создан",
+                "Сначала создайте отчет текущих взаиморасчетов.",
+                parent=self.root,
+            )
+            return None
+        return self.last_current_report_dir
+
+    def open_current_html_report(self) -> None:
+        report_dir = self._require_current_report_dir()
+        if report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_current_report(report_dir, "html"),
+            "HTML-отчет текущих взаиморасчетов открыт",
+        )
+
+    def open_current_xlsx_report(self) -> None:
+        report_dir = self._require_current_report_dir()
+        if report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_current_report(report_dir, "xlsx"),
+            "XLSX-отчет текущих взаиморасчетов открыт",
+        )
+
+    def open_current_report_folder(self) -> None:
+        report_dir = self._require_current_report_dir()
+        if report_dir is None:
+            return
+        self.open_path(report_dir)
 
     def refresh_periods(self) -> None:
         def action():
@@ -766,6 +828,7 @@ def main(argv: list[str] | None = None) -> None:
         data_dir=Path(args.data_dir),
         reports_dir=Path(args.reports_dir),
         analytics_dir=Path(args.reports_dir) / "analytics",
+        current_state_dir=Path(args.reports_dir) / "current_state",
     )
     state.ensure_data_files()
     root = tk.Tk()

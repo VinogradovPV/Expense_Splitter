@@ -1,0 +1,986 @@
+from __future__ import annotations
+
+import csv
+import json
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from html import escape
+from pathlib import Path
+from typing import Iterable, Sequence
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+
+from expense_splitter.analytics import (
+    UNCATEGORIZED,
+    aggregate_by_category,
+    aggregate_by_participant,
+    aggregate_by_payer,
+    build_top_purchases,
+)
+from expense_splitter.calculator import calculate_balances
+from expense_splitter.models import (
+    DEFAULT_PURCHASE_NAME,
+    Balance,
+    Participant,
+    Purchase,
+    Settlement,
+)
+from expense_splitter.settlement import calculate_settlements
+from expense_splitter.settlement_periods import filter_purchases_by_settlement_scope
+from expense_splitter.visual.palette import (
+    PALETTE_NAME,
+    PALETTE_VERSION,
+    QUALITATIVE_PALETTE,
+    build_stable_color_map,
+    color_for_balance_status,
+)
+
+SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "all"}
+SUPPORTED_SCOPES = {"open", "all"}
+CSV_ENCODING = "utf-8-sig"
+EMPTY_OPEN_SCOPE_MESSAGE = "Нет открытых покупок для текущих взаиморасчетов."
+
+TABLE_SPECS = (
+    ("summary.csv", "Сводка"),
+    ("purchases.csv", "Покупки"),
+    ("by_category.csv", "Расходы по категориям"),
+    ("by_payer.csv", "Расходы по плательщикам"),
+    ("by_participant.csv", "Доли участников"),
+    ("balances.csv", "Балансы"),
+    ("settlements.csv", "Итоговые переводы"),
+    ("warnings.csv", "Предупреждения"),
+)
+
+CHART_SPECS = (
+    ("spending_by_category.png", "Расходы по категориям"),
+    ("spending_by_payer.png", "Расходы по плательщикам"),
+    ("participant_share.png", "Доли участников"),
+    ("balances.png", "Балансы"),
+    ("top_purchases.png", "Крупнейшие покупки"),
+)
+
+CURRENT_HTML_CSS = """
+:root {
+  --ink:#172033; --muted:#607086; --line:#d9e2ec; --paper:#f6f8fb;
+  --card:#fff; --accent:#285f8f; --warn:#8a5a13;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--paper); color:var(--ink);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+main { max-width:1180px; margin:auto; padding:30px 20px 64px; }
+h1,h2,h3 { line-height:1.2; }
+h2 { margin-top:34px; }
+.meta,.muted { color:var(--muted); }
+.cards {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:12px; margin:22px 0;
+}
+.card,.panel {
+  background:var(--card); border:1px solid var(--line); border-radius:8px;
+}
+.card { padding:16px; }
+.card span { color:var(--muted); }
+.card strong { display:block; font-size:24px; margin-top:4px; }
+.panel { padding:18px; margin:14px 0; overflow:auto; }
+.warning {
+  background:#fff9ed; border-left:4px solid #d99a32; color:var(--warn);
+}
+.empty { padding:14px; background:#eef5fb; border:1px solid var(--line); }
+table { width:100%; min-width:640px; border-collapse:collapse; }
+th,td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; }
+th { background:#eef3f8; }
+.chart { display:block; max-width:100%; height:auto; }
+.missing { color:var(--muted); border:1px dashed var(--line); padding:14px; }
+.links { display:flex; flex-wrap:wrap; gap:12px; }
+a { color:var(--accent); }
+"""
+
+
+@dataclass(frozen=True)
+class CurrentReportDataset:
+    scope: str
+    generated_at: datetime
+    participants: list[str]
+    purchases: list[Purchase]
+    balances: list[Balance]
+    settlements: list[Settlement]
+    summary: dict[str, object]
+    by_category: list[dict[str, object]]
+    by_payer: list[dict[str, object]]
+    by_participant: list[dict[str, object]]
+    top_purchases: list[dict[str, object]]
+    warnings: list[dict[str, object]]
+
+
+def build_current_report_dataset(
+    participants: Sequence[Participant | str],
+    purchases: Sequence[Purchase],
+    scope: str = "open",
+    generated_at: datetime | None = None,
+) -> CurrentReportDataset:
+    scope_key = scope.lower()
+    if scope_key not in SUPPORTED_SCOPES:
+        raise ValueError("Scope must be one of: open, all.")
+
+    participant_names = _participant_names(participants)
+    selected = filter_purchases_by_settlement_scope(purchases, scope=scope_key)  # type: ignore[arg-type]
+    balances = calculate_balances(selected, participant_names)
+    settlements = calculate_settlements(balances)
+    generated = generated_at or datetime.now(timezone.utc).astimezone()
+
+    summary = _summary(selected, participant_names, settlements, scope_key, generated)
+    by_category = _with_share_percent(aggregate_by_category(selected), summary["total_amount"])
+
+    return CurrentReportDataset(
+        scope=scope_key,
+        generated_at=generated,
+        participants=participant_names,
+        purchases=selected,
+        balances=balances,
+        settlements=settlements,
+        summary=summary,
+        by_category=by_category,
+        by_payer=aggregate_by_payer(selected),
+        by_participant=aggregate_by_participant(selected, participant_names),
+        top_purchases=build_top_purchases(selected),
+        warnings=_warnings(selected, participant_names, scope_key),
+    )
+
+
+def generate_current_report(
+    dataset: CurrentReportDataset,
+    output_root: Path = Path("reports/current_state"),
+    output_format: str = "all",
+) -> Path:
+    format_key = output_format.lower()
+    if format_key not in SUPPORTED_FORMATS:
+        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, all.")
+
+    report_dir = output_root / f"{dataset.scope}_{dataset.generated_at:%Y-%m-%d_%H-%M-%S}"
+    tables_dir = report_dir / "tables"
+    charts_dir = report_dir / "charts"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    charts_dir.mkdir(parents=True, exist_ok=True)
+
+    warnings = [dict(row) for row in dataset.warnings]
+    generated: list[Path] = []
+
+    if format_key in {"csv", "html", "xlsx", "all"}:
+        generated.extend(write_current_csv_tables(dataset, tables_dir, warnings))
+    else:
+        generated.extend(write_minimum_tables(dataset, tables_dir, warnings))
+
+    if format_key in {"png", "html", "xlsx", "all"}:
+        chart_paths, chart_warnings = write_current_charts(dataset, charts_dir)
+        generated.extend(chart_paths)
+        warnings.extend(chart_warnings)
+        write_warnings_table(tables_dir / "warnings.csv", warnings)
+
+    if format_key in {"markdown", "html", "all"}:
+        generated.append(
+            write_current_markdown(dataset, report_dir / "current_state_report.md", warnings)
+        )
+
+    if format_key in {"html", "all"}:
+        generated.append(
+            write_current_html(dataset, report_dir / "current_state_dashboard.html", warnings)
+        )
+
+    if format_key in {"xlsx", "all"}:
+        generated.append(
+            write_current_xlsx(
+                dataset,
+                report_dir / "current_state.xlsx",
+                tables_dir,
+                charts_dir,
+            )
+        )
+
+    metadata_path = report_dir / "metadata.json"
+    generated.append(metadata_path)
+    write_current_metadata(dataset, metadata_path, generated, warnings, report_dir)
+    return report_dir
+
+
+def write_current_csv_tables(
+    dataset: CurrentReportDataset,
+    tables_dir: Path,
+    warnings: Sequence[dict[str, object]] | None = None,
+) -> list[Path]:
+    warning_rows = list(dataset.warnings if warnings is None else warnings)
+    specs = (
+        ("summary.csv", ["Показатель", "Значение"], _summary_rows(dataset)),
+        (
+            "purchases.csv",
+            [
+                "ID",
+                "Дата",
+                "Покупка",
+                "Категория",
+                "Сумма",
+                "Плательщик",
+                "Участники",
+                "Статус",
+                "Комментарий",
+            ],
+            _purchase_rows(dataset),
+        ),
+        (
+            "by_category.csv",
+            ["Категория", "Сумма", "Покупок", "Доля, %"],
+            (
+                [
+                    row["category"],
+                    row["total_amount"],
+                    row["purchase_count"],
+                    row["share_percent"],
+                ]
+                for row in dataset.by_category
+            ),
+        ),
+        (
+            "by_payer.csv",
+            ["Плательщик", "Оплачено", "Покупок"],
+            ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+        ),
+        (
+            "by_participant.csv",
+            ["Участник", "Доля расходов", "Покупок"],
+            (
+                [row["participant"], row["total_share"], row["purchase_count"]]
+                for row in dataset.by_participant
+            ),
+        ),
+        (
+            "balances.csv",
+            ["Участник", "Оплачено", "Доля", "Баланс"],
+            ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
+        ),
+        (
+            "settlements.csv",
+            ["От кого", "Кому", "Сумма"],
+            ([row.from_participant, row.to_participant, row.amount] for row in dataset.settlements),
+        ),
+        (
+            "warnings.csv",
+            ["Тип", "ID покупки", "Покупка", "Сообщение"],
+            _warning_rows(warning_rows),
+        ),
+    )
+    paths: list[Path] = []
+    for filename, headers, rows in specs:
+        path = tables_dir / filename
+        _write_csv(path, headers, rows)
+        paths.append(path)
+    return paths
+
+
+def write_minimum_tables(
+    dataset: CurrentReportDataset,
+    tables_dir: Path,
+    warnings: Sequence[dict[str, object]],
+) -> list[Path]:
+    paths: list[Path] = []
+    summary_path = tables_dir / "summary.csv"
+    _write_csv(summary_path, ["Показатель", "Значение"], _summary_rows(dataset))
+    paths.append(summary_path)
+    warning_path = tables_dir / "warnings.csv"
+    write_warnings_table(warning_path, warnings)
+    paths.append(warning_path)
+    return paths
+
+
+def write_warnings_table(path: Path, warnings: Sequence[dict[str, object]]) -> Path:
+    _write_csv(path, ["Тип", "ID покупки", "Покупка", "Сообщение"], _warning_rows(warnings))
+    return path
+
+
+def write_current_markdown(
+    dataset: CurrentReportDataset,
+    path: Path,
+    warnings: Sequence[dict[str, object]],
+) -> Path:
+    summary = dataset.summary
+    lines = [
+        "# Отчет по текущим взаиморасчетам",
+        "",
+        f"Scope: {dataset.scope}",
+        f"Snapshot: {dataset.generated_at.isoformat(timespec='seconds')}",
+        "",
+        "## Сводка",
+        "",
+        "| Показатель | Значение |",
+        "|---|---:|",
+        f"| Общая сумма | {_serialize(summary['total_amount'])} |",
+        f"| Количество покупок | {summary['purchase_count']} |",
+        f"| Средний чек | {_serialize(summary['average_purchase'])} |",
+        f"| Количество участников | {summary['participant_count']} |",
+        f"| Итоговые переводы | {summary['settlement_count']} |",
+        "",
+    ]
+    if not dataset.purchases:
+        message = EMPTY_OPEN_SCOPE_MESSAGE if dataset.scope == "open" else "Нет покупок для отчета."
+        lines.extend([message, ""])
+
+    _append_markdown_table(
+        lines,
+        "Расходы по категориям",
+        ["Категория", "Сумма", "Покупок", "Доля, %"],
+        (
+            [row["category"], row["total_amount"], row["purchase_count"], row["share_percent"]]
+            for row in dataset.by_category
+        ),
+    )
+    _append_markdown_table(
+        lines,
+        "Расходы по плательщикам",
+        ["Плательщик", "Оплачено", "Покупок"],
+        ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+    )
+    _append_markdown_table(
+        lines,
+        "Доли участников",
+        ["Участник", "Доля расходов", "Покупок"],
+        (
+            [row["participant"], row["total_share"], row["purchase_count"]]
+            for row in dataset.by_participant
+        ),
+    )
+    _append_markdown_table(
+        lines,
+        "Балансы",
+        ["Участник", "Оплачено", "Доля", "Баланс"],
+        ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
+    )
+    _append_markdown_table(
+        lines,
+        "Итоговые переводы",
+        ["От кого", "Кому", "Сумма"],
+        ([row.from_participant, row.to_participant, row.amount] for row in dataset.settlements),
+    )
+    _append_markdown_table(
+        lines,
+        "Покупки в текущем расчете",
+        [
+            "Дата",
+            "Покупка",
+            "Категория",
+            "Сумма",
+            "Плательщик",
+            "Участники",
+            "Статус",
+            "Комментарий",
+        ],
+        (
+            [row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]]
+            for row in _purchase_rows(dataset)
+        ),
+    )
+    _append_markdown_table(
+        lines,
+        "Warnings",
+        ["Тип", "ID покупки", "Покупка", "Сообщение"],
+        _warning_rows(warnings),
+    )
+
+    chart_dir = path.parent / "charts"
+    chart_paths = sorted(chart_dir.glob("*.png")) if chart_dir.exists() else []
+    if chart_paths:
+        lines.extend(["## Графики", ""])
+        for chart_path in chart_paths:
+            lines.extend([f"![{chart_path.stem}](charts/{chart_path.name})", ""])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def write_current_html(
+    dataset: CurrentReportDataset,
+    path: Path,
+    warnings: Sequence[dict[str, object]],
+) -> Path:
+    summary = dataset.summary
+    cards = (
+        ("Общая сумма", _serialize(summary["total_amount"])),
+        ("Покупок", str(summary["purchase_count"])),
+        ("Средний чек", _serialize(summary["average_purchase"])),
+        ("Участников", str(summary["participant_count"])),
+        ("Переводов", str(summary["settlement_count"])),
+    )
+    card_html = "".join(
+        f'<div class="card"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
+        for label, value in cards
+    )
+    table_html = "".join(
+        _html_table(path.parent, filename, title) for filename, title in TABLE_SPECS
+    )
+    chart_html = "".join(
+        _html_chart(path.parent, filename, title) for filename, title in CHART_SPECS
+    )
+    warning_items = "".join(f"<li>{escape(str(row.get('message', '')))}</li>" for row in warnings)
+    warnings_html = f"<ul>{warning_items}</ul>" if warning_items else "<p>Предупреждений нет.</p>"
+    csv_links = "".join(
+        f'<a href="tables/{escape(filename)}">{escape(title)} CSV</a>'
+        for filename, title in TABLE_SPECS
+    )
+    empty_note = (
+        f'<p class="empty">{escape(EMPTY_OPEN_SCOPE_MESSAGE)}</p>'
+        if not dataset.purchases and dataset.scope == "open"
+        else ""
+    )
+    document = f"""<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Отчет по текущим взаиморасчетам</title>
+<style>{CURRENT_HTML_CSS}</style></head><body><main>
+<header><h1>Отчет по текущим взаиморасчетам</h1>
+<p class="meta">Scope: {escape(dataset.scope)}<br>
+Snapshot: {escape(dataset.generated_at.isoformat(timespec='seconds'))}</p></header>
+<section><h2>Сводка</h2>{empty_note}<div class="cards">{card_html}</div></section>
+<section><h2>Warnings</h2><div class="panel warning">{warnings_html}</div></section>
+<section><h2>Графики</h2>{chart_html}</section>
+<section><h2>Таблицы</h2>{table_html}</section>
+<section><h2>Файлы</h2><div class="panel links">
+<a href="current_state_report.md">Markdown</a>{csv_links}</div></section>
+</main></body></html>"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(document, encoding="utf-8")
+    return path
+
+
+def write_current_xlsx(
+    dataset: CurrentReportDataset,
+    path: Path,
+    tables_dir: Path,
+    charts_dir: Path,
+) -> Path:
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    sheets = (
+        ("Summary", "summary.csv"),
+        ("Purchases", "purchases.csv"),
+        ("By Category", "by_category.csv"),
+        ("By Payer", "by_payer.csv"),
+        ("By Participant", "by_participant.csv"),
+        ("Balances", "balances.csv"),
+        ("Settlements", "settlements.csv"),
+        ("Warnings", "warnings.csv"),
+    )
+    for sheet_name, filename in sheets:
+        worksheet = workbook.create_sheet(sheet_name)
+        _write_sheet(worksheet, sheet_name, _read_csv(tables_dir / filename))
+    charts_sheet = workbook.create_sheet("Charts")
+    _write_charts_sheet(charts_sheet, charts_dir)
+    workbook.active = 0
+    workbook.calculation.fullCalcOnLoad = True
+    workbook.calculation.forceFullCalc = True
+    path.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(path)
+    return path
+
+
+def write_current_charts(
+    dataset: CurrentReportDataset,
+    output_dir: Path,
+) -> tuple[list[Path], list[dict[str, object]]]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generated: list[Path] = []
+    warnings: list[dict[str, object]] = []
+    specs = (
+        ("spending_by_category.png", dataset.by_category, _chart_category),
+        ("spending_by_payer.png", dataset.by_payer, _chart_payer),
+        ("participant_share.png", dataset.by_participant, _chart_participant_share),
+        ("balances.png", dataset.balances, _chart_balances),
+        ("top_purchases.png", dataset.top_purchases, _chart_top_purchases),
+    )
+    for filename, rows, renderer in specs:
+        if not dataset.purchases or not rows:
+            warnings.append(_chart_warning(filename))
+            continue
+        path = output_dir / filename
+        renderer(dataset, path)
+        generated.append(path)
+    return generated, warnings
+
+
+def write_current_metadata(
+    dataset: CurrentReportDataset,
+    path: Path,
+    generated_files: Sequence[Path],
+    warnings: Sequence[dict[str, object]],
+    report_dir: Path,
+) -> Path:
+    metadata = {
+        "schema_version": 1,
+        "report_type": "current_state",
+        "scope": dataset.scope,
+        "generated_at": dataset.generated_at.isoformat(),
+        "summary": {key: _json_value(value) for key, value in dataset.summary.items()},
+        "palette": {"name": PALETTE_NAME, "version": PALETTE_VERSION},
+        "warning_count": len(warnings),
+        "files": sorted(
+            str(item.relative_to(report_dir)).replace("\\", "/")
+            for item in generated_files
+            if item.exists()
+        ),
+    }
+    path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def _summary(
+    purchases: Sequence[Purchase],
+    participants: Sequence[str],
+    settlements: Sequence[Settlement],
+    scope: str,
+    generated_at: datetime,
+) -> dict[str, object]:
+    total_amount = sum((purchase.amount for purchase in purchases), Decimal("0.00"))
+    purchase_count = len(purchases)
+    average_purchase = (
+        (total_amount / Decimal(purchase_count)).quantize(Decimal("0.01"))
+        if purchase_count
+        else Decimal("0.00")
+    )
+    return {
+        "scope": scope,
+        "generated_at": generated_at.isoformat(timespec="seconds"),
+        "total_amount": total_amount,
+        "purchase_count": purchase_count,
+        "average_purchase": average_purchase,
+        "participant_count": len(participants),
+        "settlement_count": len(settlements),
+    }
+
+
+def _with_share_percent(
+    rows: list[dict[str, object]],
+    total_amount: object,
+) -> list[dict[str, object]]:
+    total = total_amount if isinstance(total_amount, Decimal) else Decimal(str(total_amount))
+    result: list[dict[str, object]] = []
+    for row in rows:
+        amount = row["total_amount"]
+        value = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+        share = (
+            Decimal("0.00")
+            if total == 0
+            else (value / total * Decimal("100")).quantize(Decimal("0.01"))
+        )
+        enriched = dict(row)
+        enriched["share_percent"] = share
+        result.append(enriched)
+    return result
+
+
+def _warnings(
+    purchases: Sequence[Purchase],
+    participants: Sequence[str],
+    scope: str,
+) -> list[dict[str, object]]:
+    warnings: list[dict[str, object]] = []
+    known = set(participants)
+    if not purchases:
+        warnings.append(
+            {
+                "warning_type": "no_purchases",
+                "purchase_id": "",
+                "purchase_name": "",
+                "message": (
+                    EMPTY_OPEN_SCOPE_MESSAGE if scope == "open" else "Нет покупок для отчета."
+                ),
+            }
+        )
+    for purchase in purchases:
+        if not purchase.category:
+            warnings.append(
+                _purchase_warning(
+                    "missing_category",
+                    purchase,
+                    "У покупки не указана категория.",
+                )
+            )
+        if purchase.date is None:
+            warnings.append(
+                _purchase_warning("missing_date", purchase, "У покупки не указана дата.")
+            )
+        if not purchase.participants:
+            warnings.append(
+                _purchase_warning(
+                    "empty_participants",
+                    purchase,
+                    "У покупки пустой список участников.",
+                )
+            )
+        names = [purchase.payer, *purchase.participants]
+        for name in sorted({item for item in names if item and item not in known}):
+            warnings.append(
+                _purchase_warning(
+                    "unknown_participant",
+                    purchase,
+                    f"Участник не найден в справочнике: {name}",
+                )
+            )
+    return warnings
+
+
+def _purchase_warning(warning_type: str, purchase: Purchase, message: str) -> dict[str, object]:
+    return {
+        "warning_type": warning_type,
+        "purchase_id": purchase.id,
+        "purchase_name": purchase.purchase_name or DEFAULT_PURCHASE_NAME,
+        "message": message,
+    }
+
+
+def _summary_rows(dataset: CurrentReportDataset) -> list[list[object]]:
+    summary = dataset.summary
+    return [
+        ["Scope", summary["scope"]],
+        ["Snapshot", summary["generated_at"]],
+        ["Общая сумма", summary["total_amount"]],
+        ["Количество покупок", summary["purchase_count"]],
+        ["Средний чек", summary["average_purchase"]],
+        ["Количество участников", summary["participant_count"]],
+        ["Итоговые переводы", summary["settlement_count"]],
+    ]
+
+
+def _purchase_rows(dataset: CurrentReportDataset) -> Iterable[list[object]]:
+    for purchase in sorted(dataset.purchases, key=lambda item: (item.date or date.min, item.id)):
+        yield [
+            purchase.id,
+            purchase.date,
+            purchase.purchase_name or DEFAULT_PURCHASE_NAME,
+            purchase.category or UNCATEGORIZED,
+            purchase.amount,
+            purchase.payer,
+            purchase.participants,
+            "settled" if purchase.settled else "open",
+            purchase.comment,
+        ]
+
+
+def _warning_rows(warnings: Sequence[dict[str, object]]) -> Iterable[list[object]]:
+    for row in warnings:
+        yield [
+            row.get("warning_type", ""),
+            row.get("purchase_id", ""),
+            row.get("purchase_name", ""),
+            row.get("message", ""),
+        ]
+
+
+def _write_csv(path: Path, headers: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding=CSV_ENCODING, newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(headers)
+        writer.writerows([_serialize(value) for value in row] for row in rows)
+
+
+def _read_csv(path: Path) -> list[list[str]]:
+    with path.open(encoding=CSV_ENCODING, newline="") as stream:
+        return list(csv.reader(stream))
+
+
+def _serialize(value: object) -> str:
+    if isinstance(value, Decimal):
+        return f"{value:.2f}"
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _json_value(value: object) -> object:
+    if isinstance(value, Decimal):
+        return f"{value:.2f}"
+    return value
+
+
+def _participant_names(participants: Sequence[Participant | str]) -> list[str]:
+    return [
+        participant.name if isinstance(participant, Participant) else str(participant)
+        for participant in participants
+    ]
+
+
+def _append_markdown_table(
+    lines: list[str],
+    title: str,
+    headers: Sequence[str],
+    rows: Iterable[Sequence[object]],
+) -> None:
+    serialized_rows = [[_escape_markdown(value) for value in row] for row in rows]
+    lines.extend([f"## {title}", ""])
+    if not serialized_rows:
+        lines.extend(["Нет данных.", ""])
+        return
+    lines.append("| " + " | ".join(headers) + " |")
+    lines.append("|" + "|".join("---" for _ in headers) + "|")
+    lines.extend("| " + " | ".join(row) + " |" for row in serialized_rows)
+    lines.append("")
+
+
+def _escape_markdown(value: object) -> str:
+    return _serialize(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _html_table(report_dir: Path, filename: str, title: str) -> str:
+    path = report_dir / "tables" / filename
+    if not path.exists():
+        return (
+            f'<article class="panel"><h3>{escape(title)}</h3>'
+            '<p class="missing">Таблица не создана.</p></article>'
+        )
+    rows = _read_csv(path)
+    if not rows:
+        body = '<p class="missing">Нет данных.</p>'
+    else:
+        header = "".join(f"<th>{escape(cell)}</th>" for cell in rows[0])
+        data = "".join(
+            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>"
+            for row in rows[1:]
+        )
+        body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
+    return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
+
+
+def _html_chart(report_dir: Path, filename: str, title: str) -> str:
+    path = report_dir / "charts" / filename
+    if not path.exists():
+        return (
+            f'<article class="panel"><h3>{escape(title)}</h3>'
+            '<p class="missing">График не создан: нет данных.</p></article>'
+        )
+    return (
+        f'<article class="panel"><h3>{escape(title)}</h3>'
+        f'<img class="chart" src="charts/{escape(filename)}" alt="{escape(title)}"></article>'
+    )
+
+
+def _save_barh(
+    path: Path,
+    labels: list[str],
+    values: list[float],
+    colors: list[str],
+    title: str,
+    xlabel: str,
+) -> None:
+    height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
+    fig, ax = plt.subplots(figsize=(10, height))
+    positions = range(len(labels))
+    bars = ax.barh(positions, values, color=colors)
+    ax.set_yticks(list(positions), labels=labels)
+    ax.invert_yaxis()
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.grid(axis="x", alpha=0.2)
+    _pad_axis(ax, values)
+    ax.bar_label(bars, labels=[_format_money(value) for value in values], padding=4, fontsize=9)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _pad_axis(ax, values: Sequence[float]) -> None:
+    low = min(0.0, min(values))
+    high = max(0.0, max(values))
+    span = high - low or max(abs(high), abs(low), 1.0)
+    pad = span * 0.18
+    ax.set_xlim(low - pad, high + pad)
+
+
+def _format_money(value: float) -> str:
+    return f"{value:,.2f}".replace(",", " ")
+
+
+def _chart_category(dataset: CurrentReportDataset, path: Path) -> None:
+    labels = [str(row["category"]) for row in dataset.by_category]
+    colors = build_stable_color_map(sorted(labels))
+    _save_barh(
+        path,
+        labels,
+        [float(row["total_amount"]) for row in dataset.by_category],
+        [colors[label] for label in labels],
+        "Расходы по категориям",
+        "Сумма",
+    )
+
+
+def _chart_payer(dataset: CurrentReportDataset, path: Path) -> None:
+    labels = [str(row["payer"]) for row in dataset.by_payer]
+    colors = build_stable_color_map(labels)
+    _save_barh(
+        path,
+        labels,
+        [float(row["total_paid"]) for row in dataset.by_payer],
+        [colors[label] for label in labels],
+        "Расходы по плательщикам",
+        "Оплачено",
+    )
+
+
+def _chart_participant_share(dataset: CurrentReportDataset, path: Path) -> None:
+    labels = [str(row["participant"]) for row in dataset.by_participant]
+    colors = build_stable_color_map(labels)
+    _save_barh(
+        path,
+        labels,
+        [float(row["total_share"]) for row in dataset.by_participant],
+        [colors[label] for label in labels],
+        "Доли участников",
+        "Доля расходов",
+    )
+
+
+def _chart_balances(dataset: CurrentReportDataset, path: Path) -> None:
+    rows = sorted(dataset.balances, key=lambda row: row.net)
+    _save_barh(
+        path,
+        [row.participant for row in rows],
+        [float(row.net) for row in rows],
+        [color_for_balance_status(row.net) for row in rows],
+        "Балансы",
+        "Баланс",
+    )
+
+
+def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
+    rows = list(reversed(dataset.top_purchases))
+    _save_barh(
+        path,
+        [str(row["purchase_name"]) for row in rows],
+        [float(row["amount"]) for row in rows],
+        [QUALITATIVE_PALETTE[(int(row["rank"]) - 1) % len(QUALITATIVE_PALETTE)] for row in rows],
+        "Крупнейшие покупки",
+        "Сумма",
+    )
+
+
+def _chart_warning(filename: str) -> dict[str, object]:
+    return {
+        "warning_type": "chart_no_data",
+        "purchase_id": "",
+        "purchase_name": "",
+        "message": f"График {filename} не создан: нет данных для текущего scope.",
+    }
+
+
+def _write_sheet(worksheet, sheet_name: str, rows: list[list[str]]) -> None:
+    primary = "285F8F"
+    header = "EAF1F7"
+    ink = "18212F"
+    thin = Side(style="thin", color="DCE3EC")
+    worksheet.sheet_view.showGridLines = False
+    max_columns = max((len(row) for row in rows), default=2)
+    worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max_columns)
+    title = worksheet.cell(1, 1, sheet_name)
+    title.font = Font(size=16, bold=True, color="FFFFFF")
+    title.fill = PatternFill("solid", fgColor=primary)
+    title.alignment = Alignment(vertical="center")
+    worksheet.row_dimensions[1].height = 28
+
+    if not rows:
+        worksheet.cell(3, 1, "Нет данных.")
+        return
+
+    headers = rows[0]
+    for column, value in enumerate(headers, 1):
+        cell = worksheet.cell(3, column, value)
+        cell.font = Font(bold=True, color=ink)
+        cell.fill = PatternFill("solid", fgColor=header)
+        cell.border = Border(bottom=thin)
+        cell.alignment = Alignment(wrap_text=True, vertical="center")
+    for row_index, row in enumerate(rows[1:], 4):
+        for column, raw_value in enumerate(row, 1):
+            value = _typed_value(raw_value, headers[column - 1], row)
+            cell = worksheet.cell(row_index, column, value)
+            cell.border = Border(bottom=thin)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+            if _is_money(headers[column - 1], row):
+                cell.number_format = "#,##0.00"
+    last_row = max(3, len(rows) + 2)
+    last_column = get_column_letter(max_columns)
+    worksheet.freeze_panes = "A4"
+    worksheet.auto_filter.ref = f"A3:{last_column}{last_row}"
+    for row_index in range(4, last_row + 1):
+        if row_index % 2 == 0:
+            for cell in worksheet[row_index]:
+                cell.fill = PatternFill("solid", fgColor="F7FAFC")
+    for index, value in enumerate(headers, 1):
+        column_values = [value] + [row[index - 1] for row in rows[1:] if index <= len(row)]
+        width = min(max(max((len(str(item)) for item in column_values), default=8) + 2, 12), 42)
+        worksheet.column_dimensions[get_column_letter(index)].width = width
+
+
+def _typed_value(raw_value: str, header: str, row: list[str]):
+    if raw_value == "":
+        return None
+    if header == "Дата":
+        try:
+            return date.fromisoformat(raw_value)
+        except ValueError:
+            return raw_value
+    if _is_money(header, row):
+        try:
+            return float(raw_value)
+        except ValueError:
+            return raw_value
+    if header in {"Покупок", "Количество покупок", "Количество участников", "Итоговые переводы"}:
+        try:
+            return int(raw_value)
+        except ValueError:
+            return raw_value
+    return raw_value
+
+
+def _is_money(header: str, row: list[str]) -> bool:
+    money_headers = {"Сумма", "Оплачено", "Доля расходов", "Доля", "Баланс", "Доля, %"}
+    money_summary = {"Общая сумма", "Средний чек"}
+    return header in money_headers or (header == "Значение" and row and row[0] in money_summary)
+
+
+def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
+    primary = "285F8F"
+    muted = "64748B"
+    secondary = "DCE8F2"
+    worksheet.sheet_view.showGridLines = False
+    worksheet.merge_cells("A1:J1")
+    worksheet["A1"] = "Графики"
+    worksheet["A1"].font = Font(size=16, bold=True, color="FFFFFF")
+    worksheet["A1"].fill = PatternFill("solid", fgColor=primary)
+    worksheet.row_dimensions[1].height = 28
+    chart_paths = sorted(charts_dir.glob("*.png")) if charts_dir.exists() else []
+    if not chart_paths:
+        worksheet["A3"] = "Графики не созданы: нет данных."
+        worksheet["A3"].font = Font(italic=True, color=muted)
+        worksheet["A3"].fill = PatternFill("solid", fgColor=secondary)
+        return
+    row = 3
+    for chart_path in chart_paths:
+        image = Image(chart_path)
+        if image.width > 900:
+            ratio = 900 / image.width
+            image.width = 900
+            image.height = int(image.height * ratio)
+        worksheet.add_image(image, f"A{row}")
+        row += max(24, int(image.height / 20) + 3)
+    for column in range(1, 11):
+        worksheet.column_dimensions[get_column_letter(column)].width = 12

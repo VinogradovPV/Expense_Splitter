@@ -12,7 +12,7 @@ class GuiState:
     data_dir: Path = Path("data")
     reports_dir: Path = Path("reports")
     analytics_dir: Path = Path("reports/analytics")
+    current_state_dir: Path = Path("reports/current_state")
 
     def ensure_data_files(self) -> None:
         initialize_data_files(self.data_dir, DEFAULT_PARTICIPANTS, DEFAULT_GROUPS)
-

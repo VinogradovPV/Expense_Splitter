@@ -10,6 +10,7 @@ from rich.table import Table
 from expense_splitter.analytics import build_analytics_dataset, parse_period
 from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.calculator import calculate_balances
+from expense_splitter.current_report import build_current_report_dataset, generate_current_report
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS, EXAMPLE_PURCHASES
 from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
 from expense_splitter.reporting import generate_markdown_report
@@ -462,6 +463,32 @@ def analytics_command(
         raise typer.Exit(2) from error
 
     console.print(f"[green]Analytics report generated at {report_dir}[/green]")
+
+
+@app.command("current-report")
+def current_report_command(
+    scope: str = typer.Option("open", "--scope", help="Report scope: open or all"),
+    output_format: str = typer.Option(
+        "all", "--format", help="Output: markdown, csv, png, html, xlsx, all"
+    ),
+    output_root: Path = typer.Option(
+        Path("reports/current_state"), "--output-root", help="Current-state reports root"
+    ),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Generate a current settlement-state snapshot report."""
+    try:
+        participants = load_participants(data_dir / "participants.yaml") or DEFAULT_PARTICIPANTS
+        purchases = load_purchases(data_dir / "purchases.yaml")
+        dataset = build_current_report_dataset(participants, purchases, scope=scope)
+        report_dir = generate_current_report(dataset, output_root, output_format)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(f"Current report error: {error}")
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Current state report generated at {report_dir}[/green]")
 
 
 if __name__ == "__main__":

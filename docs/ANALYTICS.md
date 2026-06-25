@@ -10,6 +10,45 @@ expense-splitter analytics --period year --year 2026 --format all
 
 GUI предоставляет те же периоды и форматы без командной строки.
 
+## Текущий snapshot взаиморасчетов
+
+`expense-splitter current-report` не является календарной analytics-командой. Он строит отчет по
+текущему scope `open` или `all`, отвечает на вопрос "из чего сейчас состоят долги" и не фильтрует
+покупки по месяцу, кварталу или году.
+
+```powershell
+expense-splitter current-report --scope open --format all
+expense-splitter current-report --scope all --format xlsx
+```
+
+Default: `--scope open --format all`. Закрытые покупки не входят в `open`; отчет не закрывает
+период, не помечает покупки settled и не меняет YAML-данные.
+
+Output:
+
+```text
+reports/current_state/open_<YYYY-MM-DD_HH-MM-SS>/
+├── current_state_report.md
+├── current_state_dashboard.html
+├── current_state.xlsx
+├── metadata.json
+├── tables/
+│   ├── summary.csv
+│   ├── purchases.csv
+│   ├── by_category.csv
+│   ├── by_payer.csv
+│   ├── by_participant.csv
+│   ├── balances.csv
+│   ├── settlements.csv
+│   └── warnings.csv
+└── charts/
+    ├── spending_by_category.png
+    ├── spending_by_payer.png
+    ├── participant_share.png
+    ├── balances.png
+    └── top_purchases.png
+```
+
 ## Форматы
 
 - `markdown` — читабельный `analytics_report.md`;

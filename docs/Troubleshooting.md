@@ -31,6 +31,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1 -Help
 Сначала создайте формат `html` или `all`. Файл `analytics_dashboard.html` должен оставаться рядом с
 папками `tables/` и `charts/`; отчёт offline и использует относительные ссылки.
 
+Для отчета текущих взаиморасчетов сначала нажмите `Создать отчет текущих взаиморасчетов` в GUI или
+выполните:
+
+```powershell
+expense-splitter current-report --scope open --format all
+```
+
+HTML находится в `reports/current_state/open_<timestamp>/current_state_dashboard.html`.
+
 ## XLSX не создаётся или восстанавливается Excel
 
 Закройте XLSX перед повторной генерацией: открытый Excel блокирует замену файла. Новая версия
@@ -40,6 +49,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-gui.ps1 -Help
 ```powershell
 expense-splitter analytics --period month --year 2026 --month 6 --format xlsx
 ```
+
+Для текущего snapshot используйте:
+
+```powershell
+expense-splitter current-report --scope open --format xlsx
+```
+
+Файл находится в `reports/current_state/open_<timestamp>/current_state.xlsx`.
 
 ## Reset-test не выполняется
 

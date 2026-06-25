@@ -100,6 +100,23 @@ expense-splitter analytics --period quarter --year 2026 --quarter 2 --format all
 expense-splitter analytics --period year --year 2026 --format all
 ```
 
+## Отчет по текущим взаиморасчетам
+
+Текущий отчет отличается от analytics month/quarter/year: это snapshot текущего scope, а не
+календарная аналитика. По умолчанию используется `open`, поэтому закрытые покупки не входят в
+отчет. Команда ничего не закрывает, не создает settlement period и не меняет YAML-данные.
+
+```powershell
+expense-splitter current-report --scope open --format all
+expense-splitter current-report --scope all --format html
+```
+
+Результаты сохраняются в `reports/current_state/open_<YYYY-MM-DD_HH-MM-SS>/` или
+`reports/current_state/all_<YYYY-MM-DD_HH-MM-SS>/`. Полный формат `all` создает
+`current_state_report.md`, `current_state_dashboard.html`, `current_state.xlsx`,
+`metadata.json`, CSV-таблицы в `tables/` и PNG-графики в `charts/`. Закрытие периода выполняется
+отдельной кнопкой или командой `settlement-period close`.
+
 Форматы:
 
 - `markdown` — `analytics_report.md`;

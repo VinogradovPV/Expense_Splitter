@@ -35,6 +35,11 @@ expense-splitter balances --scope all
 expense-splitter settle --settlement-period settlement_2026_06_30_001
 ```
 
+`expense-splitter current-report --scope open --format all` использует тот же open scope, но
+только строит отчет о текущем состоянии взаиморасчетов. Команда не закрывает период, не меняет
+`settled` и не записывает `settlement_period_id`. Для фиксации периода используйте
+`settlement-period close`.
+
 ## Close и reset-test
 
 Close сохраняет историю и исключает покупки из текущего scope. Reset-test после backups физически

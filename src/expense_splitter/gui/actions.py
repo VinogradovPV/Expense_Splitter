@@ -12,6 +12,7 @@ from pathlib import Path
 from expense_splitter.analytics import build_analytics_dataset, parse_period
 from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.calculator import calculate_balances
+from expense_splitter.current_report import build_current_report_dataset, generate_current_report
 from expense_splitter.defaults import DEFAULT_CATEGORIES, DEFAULT_GROUPS, DEFAULT_PARTICIPANTS
 from expense_splitter.gui.state import GuiState
 from expense_splitter.models import Purchase
@@ -324,6 +325,13 @@ def generate_analytics(
     return generate_analytics_report(dataset, state.analytics_dir, output_format)
 
 
+def generate_current_state_report(state: GuiState, output_format: str = "all") -> Path:
+    ensure_data(state)
+    participants = load_participants(state.data_dir / "participants.yaml") or DEFAULT_PARTICIPANTS
+    dataset = build_current_report_dataset(participants, list_purchases(state), scope="open")
+    return generate_current_report(dataset, state.current_state_dir, output_format)
+
+
 def open_folder(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     if platform.system() == "Windows":
@@ -376,8 +384,36 @@ def report_path(report_dir: Path, report_type: str) -> Path:
     return matches[0]
 
 
+def current_report_path(report_dir: Path, report_type: str) -> Path:
+    names = {
+        "html": "current_state_dashboard.html",
+        "markdown": "current_state_report.md",
+        "xlsx": "current_state.xlsx",
+    }
+    if report_type not in names:
+        raise ValueError("Неизвестный тип отчета.")
+    path = report_dir / names[report_type]
+    if not path.is_file():
+        label = report_type.upper() if report_type != "markdown" else "Markdown"
+        raise FileNotFoundError(
+            f"{label}-отчет текущих взаиморасчетов не создан. "
+            "Сначала создайте отчет текущих взаиморасчетов."
+        )
+    return path
+
+
 def open_report(report_dir: Path, report_type: str) -> None:
     path = report_path(report_dir, report_type)
+    if platform.system() == "Windows":
+        os.startfile(path)  # type: ignore[attr-defined]
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
+def open_current_report(report_dir: Path, report_type: str) -> None:
+    path = current_report_path(report_dir, report_type)
     if platform.system() == "Windows":
         os.startfile(path)  # type: ignore[attr-defined]
     elif platform.system() == "Darwin":
