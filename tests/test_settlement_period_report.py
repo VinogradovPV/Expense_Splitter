@@ -164,6 +164,7 @@ def test_generate_settlement_period_report_writes_all_outputs(tmp_path):
     assert (report_dir / "settlement_period_report.md").is_file()
     assert (report_dir / "settlement_period_dashboard.html").is_file()
     assert (report_dir / "settlement_period.xlsx").is_file()
+    assert (report_dir / "settlement_period.pdf").is_file()
     assert (report_dir / "metadata.json").is_file()
     assert {path.name for path in (report_dir / "tables").glob("*.csv")} == {
         "summary.csv",
@@ -204,6 +205,9 @@ def test_settlement_period_report_files_are_readable(tmp_path):
     assert purchases_path.read_bytes().startswith(b"\xef\xbb\xbf")
     with purchases_path.open(encoding="utf-8-sig", newline="") as stream:
         rows = list(csv.reader(stream))
+    full_header = rows[0]
+    assert full_header[-2:] == ["payer_total", "payer_rank"]
+    rows[0] = full_header[:-2]
     assert rows[0] == [
         "ID",
         "Дата",

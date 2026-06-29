@@ -37,6 +37,7 @@ def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
     assert (report_dir / "metadata.json").is_file()
     assert (report_dir / "analytics_dashboard.html").is_file()
     assert (report_dir / "expense_analytics_2026-06.xlsx").is_file()
+    assert (report_dir / "expense_analytics_2026-06.pdf").is_file()
     assert {path.name for path in (report_dir / "tables").glob("*.csv")} == {
         "summary.csv",
         "purchases.csv",
@@ -65,6 +66,7 @@ def test_csv_is_utf8_sig_with_russian_headers_and_decimal_strings(tmp_path):
         rows = list(csv.reader(stream))
 
     assert rows[0][2] == "Наименование покупки"
+    assert rows[0][-2:] == ["payer_total", "payer_rank"]
     assert rows[1][3] == "120.50"
     assert rows[1][5] == "Алиса, Боб"
 

@@ -39,6 +39,8 @@ from expense_splitter.models import (
     Settlement,
     SettlementPeriod,
 )
+from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
+from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.settlement_periods import get_settlement_period
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
@@ -56,6 +58,17 @@ TABLE_SPECS = (
     ("balances.csv", "Балансы"),
     ("settlements.csv", "Итоговые переводы"),
     ("warnings.csv", "Warnings"),
+)
+
+SETTLEMENT_PERIOD_PDF_TABLES = (
+    PdfTableSpec("summary.csv", "Сводка"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям"),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
+    PdfTableSpec("by_participant.csv", "Доли участников"),
+    PdfTableSpec("balances.csv", "Балансы"),
+    PdfTableSpec("settlements.csv", "Итоговые переводы"),
+    PdfTableSpec("purchases.csv", "Покупки периода"),
+    PdfTableSpec("warnings.csv", "Warnings"),
 )
 
 
@@ -139,7 +152,7 @@ def generate_settlement_period_report(
 ) -> Path:
     format_key = output_format.lower()
     if format_key not in SUPPORTED_FORMATS:
-        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, all.")
+        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, pdf, all.")
 
     report_dir = output_root / f"{dataset.period.id}_{dataset.generated_at:%Y-%m-%d_%H-%M-%S}"
     tables_dir = report_dir / "tables"
@@ -150,12 +163,12 @@ def generate_settlement_period_report(
     warnings = [dict(row) for row in dataset.warnings]
     generated: list[Path] = []
 
-    if format_key in {"csv", "html", "xlsx", "all"}:
+    if format_key in {"csv", "html", "xlsx", "pdf", "all"}:
         generated.extend(write_settlement_period_csv_tables(dataset, tables_dir, warnings))
     else:
         generated.extend(write_settlement_period_minimum_tables(dataset, tables_dir, warnings))
 
-    if format_key in {"png", "html", "xlsx", "all"}:
+    if format_key in {"png", "html", "xlsx", "pdf", "all"}:
         chart_paths, chart_warnings = write_settlement_period_charts(dataset, charts_dir)
         generated.extend(chart_paths)
         warnings.extend(chart_warnings)
@@ -185,6 +198,18 @@ def generate_settlement_period_report(
                 report_dir / "settlement_period.xlsx",
                 tables_dir,
                 charts_dir,
+            )
+        )
+
+    if format_key in {"pdf", "all"}:
+        generated.append(
+            write_pdf_report(
+                report_dir / "settlement_period.pdf",
+                title=REPORT_TITLE,
+                metadata_rows=_summary_rows(dataset),
+                tables_dir=tables_dir,
+                table_specs=SETTLEMENT_PERIOD_PDF_TABLES,
+                charts_dir=charts_dir,
             )
         )
 
@@ -697,7 +722,8 @@ def _write_summary_table(path: Path, dataset: SettlementPeriodReportDataset) -> 
 
 
 def _purchase_rows(dataset: SettlementPeriodReportDataset) -> Iterable[list[object]]:
-    for purchase in sorted(dataset.purchases, key=lambda item: (item.date or date.min, item.id)):
+    for row in sorted_purchases_with_payer_totals(dataset.purchases):
+        purchase = row.purchase
         yield [
             purchase.id,
             purchase.date,
@@ -708,6 +734,8 @@ def _purchase_rows(dataset: SettlementPeriodReportDataset) -> Iterable[list[obje
             purchase.participants,
             "settled" if purchase.settled else "open",
             purchase.comment,
+            row.payer_total,
+            row.payer_rank,
         ]
 
 

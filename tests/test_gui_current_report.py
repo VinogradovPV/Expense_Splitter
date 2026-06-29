@@ -48,5 +48,8 @@ def test_gui_current_report_path_handles_missing_files(tmp_path):
     with pytest.raises(FileNotFoundError, match="Сначала создайте отчет текущих взаиморасчетов"):
         actions.current_report_path(report_dir, "html")
 
-    with pytest.raises(ValueError, match="Неизвестный тип"):
+    with pytest.raises(FileNotFoundError, match="Сначала создайте отчет текущих взаиморасчетов"):
         actions.current_report_path(report_dir, "pdf")
+
+    with pytest.raises(ValueError, match="Неизвестный тип"):
+        actions.current_report_path(report_dir, "unknown")

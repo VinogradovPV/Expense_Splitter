@@ -11,10 +11,22 @@ from expense_splitter.analytics import AnalyticsDataset
 from expense_splitter.analytics_charts import generate_analytics_charts
 from expense_splitter.analytics_html import write_html_report
 from expense_splitter.analytics_xlsx import write_xlsx_report
+from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
+from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
-SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "all"}
+SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "pdf", "all"}
 CSV_ENCODING = "utf-8-sig"
+ANALYTICS_PDF_TABLES = (
+    PdfTableSpec("summary.csv", "Сводка"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям"),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
+    PdfTableSpec("by_participant.csv", "Доли участников"),
+    PdfTableSpec("balances.csv", "Балансы"),
+    PdfTableSpec("settlements.csv", "Переводы"),
+    PdfTableSpec("purchases.csv", "Покупки"),
+    PdfTableSpec("warnings.csv", "Предупреждения"),
+)
 
 
 def generate_analytics_report(
@@ -25,7 +37,7 @@ def generate_analytics_report(
     """Generate requested analytics artifacts and return the period report directory."""
     format_key = output_format.lower()
     if format_key not in SUPPORTED_FORMATS:
-        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, all.")
+        raise ValueError("Format must be one of: markdown, csv, png, html, xlsx, pdf, all.")
 
     report_dir = output_root / str(dataset.period_spec.year) / dataset.period_spec.period_id
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -37,12 +49,12 @@ def generate_analytics_report(
         for stale_dir in (report_dir / "tables", report_dir / "charts"):
             stale_dir.mkdir(parents=True, exist_ok=True)
 
-    if format_key in {"png", "html", "xlsx", "all"}:
+    if format_key in {"png", "html", "xlsx", "pdf", "all"}:
         chart_paths, chart_warnings = generate_analytics_charts(dataset, report_dir / "charts")
         generated.extend(chart_paths)
         warnings.extend(chart_warnings)
 
-    if format_key in {"csv", "html", "xlsx", "all"}:
+    if format_key in {"csv", "html", "xlsx", "pdf", "all"}:
         generated.extend(write_csv_tables(dataset, report_dir / "tables", warnings))
     elif format_key == "png" and warnings:
         generated.append(write_warnings_csv(report_dir / "tables" / "warnings.csv", warnings))
@@ -68,6 +80,18 @@ def generate_analytics_report(
                 report_dir / f"expense_analytics_{dataset.period_spec.period_id}.xlsx",
                 report_dir / "tables",
                 report_dir / "charts",
+            )
+        )
+
+    if format_key in {"pdf", "all"}:
+        generated.append(
+            write_pdf_report(
+                report_dir / f"expense_analytics_{dataset.period_spec.period_id}.pdf",
+                title="Аналитический отчет",
+                metadata_rows=_summary_rows(dataset),
+                tables_dir=report_dir / "tables",
+                table_specs=ANALYTICS_PDF_TABLES,
+                charts_dir=report_dir / "charts",
             )
         )
 
@@ -321,18 +345,19 @@ def _summary_rows(dataset: AnalyticsDataset) -> list[list[object]]:
 
 
 def _purchase_rows(dataset: AnalyticsDataset) -> Iterable[list[object]]:
-    for row in sorted(
-        dataset.purchases, key=lambda purchase: (purchase.date or date.min, purchase.id)
-    ):
+    for row in sorted_purchases_with_payer_totals(dataset.purchases):
+        purchase = row.purchase
         yield [
-            row.id,
-            row.date,
-            row.purchase_name,
-            row.amount,
-            row.payer,
-            row.participants,
-            row.category,
-            row.comment,
+            purchase.id,
+            purchase.date,
+            purchase.purchase_name,
+            purchase.amount,
+            purchase.payer,
+            purchase.participants,
+            purchase.category,
+            purchase.comment,
+            row.payer_total,
+            row.payer_rank,
         ]
 
 
@@ -362,10 +387,26 @@ def _warning_rows(warnings: Sequence[dict[str, object]]) -> Iterable[list[object
 
 def _write_csv(path: Path, headers: Sequence[str], rows: Iterable[Sequence[object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    materialized_rows = [list(row) for row in rows]
+    output_headers = _headers_for_rows(path, headers, materialized_rows)
     with path.open("w", encoding=CSV_ENCODING, newline="") as stream:
         writer = csv.writer(stream)
-        writer.writerow(headers)
-        writer.writerows([_serialize(value) for value in row] for row in rows)
+        writer.writerow(output_headers)
+        writer.writerows([_serialize(value) for value in row] for row in materialized_rows)
+
+
+def _headers_for_rows(
+    path: Path,
+    headers: Sequence[str],
+    rows: Sequence[Sequence[object]],
+) -> list[str]:
+    result = list(headers)
+    max_columns = max((len(row) for row in rows), default=len(result))
+    if path.name == "purchases.csv" and max_columns == len(result) + 2:
+        result.extend(["payer_total", "payer_rank"])
+    while len(result) < max_columns:
+        result.append(f"extra_{len(result) + 1}")
+    return result
 
 
 def _serialize(value: object) -> str:
@@ -392,14 +433,25 @@ def _append_markdown_table(
     lines: list[str], title: str, headers: Sequence[str], rows: Iterable[Sequence[object]]
 ) -> None:
     serialized_rows = [[_escape_markdown(value) for value in row] for row in rows]
+    output_headers = _headers_for_markdown(headers, serialized_rows)
     lines.extend([f"## {title}", ""])
     if not serialized_rows:
         lines.extend(["Нет данных.", ""])
         return
-    lines.append("| " + " | ".join(headers) + " |")
-    lines.append("|" + "|".join("---" for _ in headers) + "|")
+    lines.append("| " + " | ".join(output_headers) + " |")
+    lines.append("|" + "|".join("---" for _ in output_headers) + "|")
     lines.extend("| " + " | ".join(row) + " |" for row in serialized_rows)
     lines.append("")
+
+
+def _headers_for_markdown(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
+    result = list(headers)
+    max_columns = max((len(row) for row in rows), default=len(result))
+    if max_columns == len(result) + 2:
+        result.extend(["payer_total", "payer_rank"])
+    while len(result) < max_columns:
+        result.append(f"extra_{len(result) + 1}")
+    return result
 
 
 def _escape_markdown(value: object) -> str:

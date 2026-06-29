@@ -512,7 +512,7 @@ def settlement_period_reopen(
 def settlement_period_report_command(
     settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
     output_format: str = typer.Option(
-        "all", "--format", help="Output: markdown, csv, png, html, xlsx, all"
+        "all", "--format", help="Output: markdown, csv, png, html, xlsx, pdf, all"
     ),
     output_root: Path = typer.Option(
         Path("reports/settlement_periods"),
@@ -576,7 +576,7 @@ def analytics_command(
     month: int = typer.Option(None, "--month", help="Month number for month period"),
     quarter: int = typer.Option(None, "--quarter", help="Quarter number for quarter period"),
     output_format: str = typer.Option(
-        "all", "--format", help="Output: markdown, csv, png, html, xlsx, all"
+        "all", "--format", help="Output: markdown, csv, png, html, xlsx, pdf, all"
     ),
     output_root: Path = typer.Option(
         Path("reports/analytics"), "--output-root", help="Analytics reports root"
@@ -606,7 +606,7 @@ def analytics_command(
 def current_report_command(
     scope: str = typer.Option("open", "--scope", help="Report scope: open or all"),
     output_format: str = typer.Option(
-        "all", "--format", help="Output: markdown, csv, png, html, xlsx, all"
+        "all", "--format", help="Output: markdown, csv, png, html, xlsx, pdf, all"
     ),
     output_root: Path = typer.Option(
         Path("reports/current_state"), "--output-root", help="Current-state reports root"

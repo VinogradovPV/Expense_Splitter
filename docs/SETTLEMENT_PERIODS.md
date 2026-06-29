@@ -112,3 +112,13 @@ expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIO
 В GUI таблица периодов по умолчанию скрывает пустые записи. Можно сменить фильтр на
 `empty`, `with_purchases`, `closed`, `reopened` или `all`, отредактировать metadata выбранного
 периода, удалить один пустой период или удалить все пустые тестовые периоды после typed confirm.
+
+## PDF отчета периода
+
+`settlement-period report <id> --format pdf` создает `settlement_period.pdf` в каталоге
+`reports/settlement_periods/<id>_<timestamp>/`. Формат `all` также включает PDF.
+
+PDF использует тот же исторический snapshot периода, что Markdown/HTML/XLSX: `purchase_ids`,
+`total_amount` и `settlements` берутся из `settlement_periods.yaml`, а детали покупок догружаются
+по snapshot id. Порядок покупок единый для всех форматов: сначала payer с максимальной общей
+суммой, затем покупки этого payer по сумме убыванию.

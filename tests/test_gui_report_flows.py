@@ -61,10 +61,12 @@ def test_report_paths_and_missing_messages(tmp_path):
     (report_dir / "analytics_dashboard.html").write_text("<html></html>", encoding="utf-8")
     (report_dir / "analytics_report.md").write_text("# Report", encoding="utf-8")
     (report_dir / "expense_analytics_2026-06.xlsx").write_bytes(b"xlsx")
+    (report_dir / "expense_analytics_2026-06.pdf").write_bytes(b"pdf")
 
     assert actions.report_path(report_dir, "html").name == "analytics_dashboard.html"
     assert actions.report_path(report_dir, "markdown").name == "analytics_report.md"
     assert actions.report_path(report_dir, "xlsx").suffix == ".xlsx"
+    assert actions.report_path(report_dir, "pdf").suffix == ".pdf"
     with pytest.raises(FileNotFoundError, match="Сначала создайте отчёт"):
         actions.report_path(tmp_path / "missing", "html")
 

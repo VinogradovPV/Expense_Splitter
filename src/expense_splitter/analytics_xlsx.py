@@ -123,6 +123,11 @@ def _write_table_sheet(worksheet, sheet_name: str, rows: list[list[str]]) -> Non
 def _typed_value(raw_value: str, header: str, row: list[str]):
     if raw_value == "":
         return None
+    if header == "payer_rank":
+        try:
+            return int(raw_value)
+        except ValueError:
+            return raw_value
     if header == "Дата":
         try:
             return date.fromisoformat(raw_value)
@@ -142,6 +147,8 @@ def _typed_value(raw_value: str, header: str, row: list[str]):
 
 
 def _is_money(header: str, row: list[str]) -> bool:
+    if header == "payer_total":
+        return True
     return header in MONEY_HEADERS or (
         header == "Значение" and row and row[0] in SUMMARY_MONEY_LABELS
     )

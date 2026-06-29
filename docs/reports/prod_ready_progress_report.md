@@ -1081,3 +1081,22 @@ HTML dashboard и XLSX report остаются P2. Generated reports в `reports
 Содержательные `closed` periods остаются историческим snapshot: `purchase_ids`, `total_amount`,
 `settlements`, даты и статус не меняются metadata-командами и не пересчитываются. Удалять можно
 только empty periods: без покупок, с нулевой суммой и без переводов.
+
+## P2.RPT.3 — Unified PDF reports and payer-based purchase sorting
+
+Дата: 2026-06-29
+Статус: реализуется локально; финальные проверки, commit, push и CI фиксируются в ответе этапа.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/report_sorting.py` | Единая сортировка purchases по payer total, amount, date, purchase_name и id |
+| `src/expense_splitter/report_pdf.py` | Общий ReportLab PDF renderer, A4 landscape, font discovery, таблицы из CSV и PNG charts |
+| Analytics/current/settlement reports | Добавлен формат `pdf`; `all` включает PDF |
+| CSV/XLSX/HTML/PDF purchases | Добавлены `payer_total` и `payer_rank`, порядок строк единый |
+| GUI | Добавлены `pdf` в выбор формата analytics и кнопки открытия PDF для analytics/current/settlement-period |
+| `pyproject.toml` | Добавлена зависимость `reportlab>=4.2` |
+
+PDF создается нативно через ReportLab и локальный кириллический шрифт; browser print и heavy
+browser dependencies не используются.

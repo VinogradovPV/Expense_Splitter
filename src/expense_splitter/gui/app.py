@@ -161,6 +161,11 @@ class ExpenseSplitterGui:
         )
         ttk.Button(
             toolbar,
+            text="Открыть PDF",
+            command=self.open_current_pdf_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
             text="Открыть папку отчета",
             command=self.open_current_report_folder,
         ).pack(side="left", padx=6)
@@ -214,6 +219,11 @@ class ExpenseSplitterGui:
         ).pack(side="left", padx=6)
         ttk.Button(
             toolbar,
+            text="Открыть PDF отчета периода",
+            command=self.open_period_pdf_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
             text="Открыть папку отчета периода",
             command=self.open_period_report_folder,
         ).pack(side="left", padx=6)
@@ -254,7 +264,7 @@ class ExpenseSplitterGui:
             (
                 "Формат",
                 self.analytics_format_var,
-                ("markdown", "csv", "png", "html", "xlsx", "all"),
+                ("markdown", "csv", "png", "html", "xlsx", "pdf", "all"),
             ),
         )
         for row, (label, variable, values) in enumerate(rows):
@@ -282,7 +292,10 @@ class ExpenseSplitterGui:
             row=len(rows) + 1, column=1, sticky="ew", padx=4, pady=4
         )
         ttk.Button(form, text="Открыть Markdown", command=self.open_markdown_report).grid(
-            row=len(rows) + 2, column=0, columnspan=2, sticky="ew", padx=4, pady=4
+            row=len(rows) + 2, column=0, sticky="ew", padx=4, pady=4
+        )
+        ttk.Button(form, text="Открыть PDF", command=self.open_pdf_report).grid(
+            row=len(rows) + 2, column=1, sticky="ew", padx=4, pady=4
         )
         ttk.Label(form, textvariable=self.last_report_status_var, wraplength=500).grid(
             row=len(rows) + 3, column=0, columnspan=2, sticky="w", padx=4, pady=8
@@ -630,6 +643,15 @@ class ExpenseSplitterGui:
             "XLSX-отчет текущих взаиморасчетов открыт",
         )
 
+    def open_current_pdf_report(self) -> None:
+        report_dir = self._require_current_report_dir()
+        if report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_current_report(report_dir, "pdf"),
+            "PDF-отчет текущих взаиморасчетов открыт",
+        )
+
     def open_current_report_folder(self) -> None:
         report_dir = self._require_current_report_dir()
         if report_dir is None:
@@ -922,6 +944,15 @@ class ExpenseSplitterGui:
         self.run_safely(
             lambda: actions.open_settlement_period_report(report_dir, "xlsx"),
             "XLSX-отчет периода открыт",
+        )
+
+    def open_period_pdf_report(self) -> None:
+        period, report_dir = self._require_period_report_dir()
+        if period is None or report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_settlement_period_report(report_dir, "pdf"),
+            "PDF-отчет периода открыт",
         )
 
     def open_period_report_folder(self) -> None:
@@ -1289,6 +1320,19 @@ class ExpenseSplitterGui:
             return
         self.run_safely(
             lambda: actions.open_report(self.last_analytics_report_dir, "xlsx"), "XLSX-отчёт открыт"
+        )
+
+    def open_pdf_report(self) -> None:
+        if self.last_analytics_report_dir is None:
+            messagebox.showerror(
+                "PDF не найден",
+                "PDF не найден. Создайте отчет в формате PDF или all.",
+                parent=self.root,
+            )
+            return
+        self.run_safely(
+            lambda: actions.open_report(self.last_analytics_report_dir, "pdf"),
+            "PDF-отчет открыт",
         )
 
     def open_markdown_report(self) -> None:

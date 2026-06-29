@@ -564,6 +564,7 @@ def report_path(report_dir: Path, report_type: str) -> Path:
         "html": "analytics_dashboard.html",
         "markdown": "analytics_report.md",
         "xlsx": "expense_analytics_*.xlsx",
+        "pdf": "expense_analytics_*.pdf",
     }
     if report_type not in patterns:
         raise ValueError("Неизвестный тип отчёта.")
@@ -581,6 +582,7 @@ def current_report_path(report_dir: Path, report_type: str) -> Path:
         "html": "current_state_dashboard.html",
         "markdown": "current_state_report.md",
         "xlsx": "current_state.xlsx",
+        "pdf": "current_state.pdf",
     }
     if report_type not in names:
         raise ValueError("Неизвестный тип отчета.")
@@ -599,6 +601,7 @@ def settlement_period_report_path(report_dir: Path, report_type: str) -> Path:
         "html": "settlement_period_dashboard.html",
         "markdown": "settlement_period_report.md",
         "xlsx": "settlement_period.xlsx",
+        "pdf": "settlement_period.pdf",
     }
     if report_type not in names:
         raise ValueError("Неизвестный тип отчета.")

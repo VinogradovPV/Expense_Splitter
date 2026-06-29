@@ -133,6 +133,21 @@ expense-splitter settlement-period delete-empty <id> --confirm DELETE_EMPTY_PERI
 expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIODS
 ```
 
+## PDF не создан
+
+PDF создается нативно через ReportLab и локальный шрифт с кириллицей. Если команда сообщает, что
+PDF font not found, установите Arial, Segoe UI, Tahoma, DejaVu Sans или Liberation Sans и
+повторите отчет. Browser print не используется, поэтому настройки печати браузера не влияют на
+layout PDF.
+
+Проверьте, что выбран формат `pdf` или `all`:
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format pdf
+expense-splitter current-report --scope open --format pdf
+expense-splitter settlement-period report <id> --format pdf
+```
+
 ## PyInstaller не собирает exe
 
 Установите dev-зависимости и запускайте сборку из корня:

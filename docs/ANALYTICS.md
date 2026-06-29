@@ -127,3 +127,18 @@ Settlements, Top Purchases, Warnings и Charts. Денежные значени�
 
 Вся папка `reports/` является generated artifact и исключена из Git. Её можно удалить и создать
 заново; исходные YAML в `data/` при этом не затрагиваются.
+## PDF reports
+
+Analytics reports support `--format pdf` and include PDF in `--format all`.
+
+```powershell
+expense-splitter analytics --period month --year 2026 --month 6 --format pdf
+expense-splitter analytics --period quarter --year 2026 --quarter 2 --format pdf
+expense-splitter analytics --period year --year 2026 --format pdf
+```
+
+The file is saved as `reports/analytics/<year>/<period-id>/expense_analytics_<period-id>.pdf`.
+PDF is generated natively with ReportLab and local fonts; it is not browser print output.
+
+The purchases table is sorted by payer total descending, then by purchase amount descending inside
+each payer. CSV adds `payer_total` and `payer_rank` so the grouping remains machine-readable.

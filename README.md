@@ -248,6 +248,27 @@ expense-splitter settlement-period delete-empty settlement_2026_06_30_001 --conf
 expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIODS
 ```
 
+## Native PDF reports
+
+Reports support native PDF generation through ReportLab. PDF is not produced through browser
+printing, Playwright, Selenium, wkhtmltopdf, WeasyPrint, Excel COM, or external web services.
+The generator discovers a local Cyrillic-capable font such as Arial, Segoe UI, Tahoma,
+DejaVu Sans, or Liberation Sans; if no such font is available, install one and rerun the report.
+
+PDF is available for:
+
+- analytics: `expense_analytics_<period-id>.pdf`;
+- current-report: `current_state.pdf`;
+- settlement-period report: `settlement_period.pdf`.
+
+Use `--format pdf` to create only PDF or `--format all` to include PDF with the existing
+Markdown, CSV, PNG, HTML and XLSX outputs.
+
+Purchase tables in all report formats use the same business sorting: payers are ordered by
+`payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by
+amount descending, date descending, purchase name ascending and id ascending. CSV purchases tables
+include machine-readable `payer_total` and `payer_rank` columns.
+
 ## Roadmap
 
 - P2.REL.1 — release quality gate и проверка standalone-сборки;

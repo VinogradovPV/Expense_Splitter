@@ -101,6 +101,7 @@ def test_generate_current_report_writes_all_outputs(tmp_path):
     assert (report_dir / "current_state_report.md").is_file()
     assert (report_dir / "current_state_dashboard.html").is_file()
     assert (report_dir / "current_state.xlsx").is_file()
+    assert (report_dir / "current_state.pdf").is_file()
     assert (report_dir / "metadata.json").is_file()
     assert {path.name for path in (report_dir / "tables").glob("*.csv")} == {
         "summary.csv",
@@ -135,6 +136,9 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     assert purchases_path.read_bytes().startswith(b"\xef\xbb\xbf")
     with purchases_path.open(encoding="utf-8-sig", newline="") as stream:
         rows = list(csv.reader(stream))
+    full_header = rows[0]
+    assert full_header[-2:] == ["payer_total", "payer_rank"]
+    rows[0] = full_header[:-2]
     assert rows[0] == [
         "ID",
         "Дата",
