@@ -114,6 +114,25 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 `reports/`, `.pytest_cache/`, `.ruff_cache/`, `__pycache__/`, `build/`, `dist/`, `*.egg-info/` и
 `*.bak` не являются исходниками и не должны попадать в Git. Удаление `reports/` не удаляет YAML.
 
+## Период не закрывается или не удаляется
+
+Если GUI пишет, что период без покупок не создается обычным close flow, проверьте даты preview:
+в выбранном диапазоне нет open-покупок. Скорректируйте `date_from/date_to` или сначала добавьте
+покупки.
+
+Если закрытие предлагает неожиданную дату, проверьте список периодов. Автоподстановка смотрит
+только на последний содержательный `closed` period с покупками и суммой больше нуля. Пустые
+тестовые и `reopened` periods намеренно игнорируются.
+
+Непустой period удалить нельзя: это исторический snapshot. Используйте `Переоткрыть период`,
+если покупки нужно вернуть в open scope, или создайте отчет периода для просмотра истории.
+Пустые технические периоды удаляются только с typed confirm:
+
+```powershell
+expense-splitter settlement-period delete-empty <id> --confirm DELETE_EMPTY_PERIOD
+expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIODS
+```
+
 ## PyInstaller не собирает exe
 
 Установите dev-зависимости и запускайте сборку из корня:

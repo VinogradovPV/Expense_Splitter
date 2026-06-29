@@ -12,6 +12,8 @@ from expense_splitter.gui.dialogs import (
     AddPurchaseDialog,
     ClosePeriodDialog,
     EditPurchaseDialog,
+    PeriodInput,
+    PeriodMetadataDialog,
     parse_comma_separated,
 )
 from expense_splitter.gui.state import GuiState
@@ -49,6 +51,21 @@ class ExpenseSplitterGui:
         self.notebook.add(tab, text="Покупки")
         toolbar = ttk.Frame(tab)
         toolbar.pack(fill="x", padx=6, pady=6)
+        self.period_status_filter_var = tk.StringVar(value="all")
+        self.hide_empty_periods_var = tk.BooleanVar(value=True)
+        ttk.Combobox(
+            toolbar,
+            textvariable=self.period_status_filter_var,
+            values=("all", "closed", "reopened", "empty", "with_purchases"),
+            state="readonly",
+            width=16,
+        ).pack(side="left", padx=6)
+        ttk.Checkbutton(
+            toolbar,
+            text="Скрыть пустые",
+            variable=self.hide_empty_periods_var,
+            command=self.refresh_periods,
+        ).pack(side="left", padx=6)
         ttk.Button(toolbar, text="Обновить", command=self.refresh_purchases).pack(side="left")
         ttk.Button(toolbar, text="Добавить покупку", command=self.add_purchase).pack(
             side="left", padx=6
@@ -199,6 +216,17 @@ class ExpenseSplitterGui:
             toolbar,
             text="Открыть папку отчета периода",
             command=self.open_period_report_folder,
+        ).pack(side="left", padx=6)
+        ttk.Button(toolbar, text="Редактировать период", command=self.edit_period).pack(
+            side="left", padx=6
+        )
+        ttk.Button(toolbar, text="Удалить период", command=self.delete_empty_period).pack(
+            side="left", padx=6
+        )
+        ttk.Button(
+            toolbar,
+            text="Удалить пустые тестовые периоды",
+            command=self.delete_all_empty_periods,
         ).pack(side="left", padx=6)
         self.periods_tree = make_tree(
             tab,
@@ -611,7 +639,11 @@ class ExpenseSplitterGui:
     def refresh_periods(self) -> None:
         def action():
             clear_tree(self.periods_tree)
-            for period in actions.settlement_periods(self.state):
+            for period in actions.visible_settlement_periods(
+                self.state,
+                self.period_status_filter_var.get(),
+                self.hide_empty_periods_var.get(),
+            ):
                 self.periods_tree.insert(
                     "",
                     "end",
@@ -920,6 +952,82 @@ class ExpenseSplitterGui:
         if period:
             self._show_period(period)
 
+    def edit_period(self) -> None:
+        period = self._selected_period()
+        if not period:
+            return
+        allow_dates = actions.is_empty_period(period)
+        dialog = PeriodMetadataDialog(self.root, period, allow_dates)
+        self.root.wait_window(dialog)
+        if not dialog.result:
+            return
+        data = dialog.result
+        result = self.run_safely(
+            lambda: actions.edit_period_metadata(
+                self.state,
+                period.id,
+                data.name,
+                data.notes,
+                data.date_from if allow_dates else None,
+                data.date_to if allow_dates else None,
+            ),
+            "Период изменен",
+        )
+        if result:
+            self.refresh_periods()
+
+    def delete_empty_period(self) -> None:
+        period = self._selected_period()
+        if not period:
+            return
+        if not actions.is_empty_period(period):
+            messagebox.showerror(
+                "Удаление запрещено",
+                "Период содержит покупки или переводы. Для сохранения истории его нельзя удалить. "
+                "Используйте переоткрытие периода или отчет периода.",
+                parent=self.root,
+            )
+            return
+        confirm = simpledialog.askstring(
+            "Typed confirm",
+            f"Введите {actions.DELETE_EMPTY_PERIOD_CONFIRM}:",
+            parent=self.root,
+        )
+        result = self.run_safely(
+            lambda: actions.delete_empty_period(self.state, period.id, confirm or ""),
+            "Пустой период удален",
+        )
+        if result:
+            self.refresh_periods()
+
+    def delete_all_empty_periods(self) -> None:
+        periods = [
+            period
+            for period in actions.settlement_periods(self.state)
+            if actions.is_empty_period(period)
+        ]
+        if not periods:
+            messagebox.showinfo("Пустые периоды", "Пустых тестовых периодов нет.", parent=self.root)
+            return
+        names = "\n".join(f"{period.id} — {period.name}" for period in periods)
+        if not messagebox.askyesno(
+            "Удалить пустые периоды",
+            f"Будут удалены только пустые периоды:\n\n{names}\n\nПродолжить?",
+            parent=self.root,
+        ):
+            return
+        confirm = simpledialog.askstring(
+            "Typed confirm",
+            f"Введите {actions.DELETE_EMPTY_PERIODS_CONFIRM}:",
+            parent=self.root,
+        )
+        deleted = self.run_safely(
+            lambda: actions.delete_all_empty_periods(self.state, confirm or ""),
+            "Пустые периоды удалены",
+        )
+        if deleted is not None:
+            self.refresh_periods()
+
     def reopen_period(self) -> None:
         period = self._selected_period()
         if not period:
@@ -1066,7 +1174,15 @@ class ExpenseSplitterGui:
         )
 
     def _period_input(self):
-        dialog = ClosePeriodDialog(self.root)
+        suggestion = self.run_safely(lambda: actions.suggest_close_period(self.state))
+        suggested = None
+        if suggestion is not None:
+            suggested = PeriodInput(
+                suggestion.date_from.isoformat(),
+                suggestion.date_to.isoformat(),
+                suggestion.name,
+            )
+        dialog = ClosePeriodDialog(self.root, suggested)
         self.root.wait_window(dialog)
         return dialog.result
 
@@ -1081,6 +1197,7 @@ class ExpenseSplitterGui:
                 "Preview закрытия периода",
                 f"Покупок: {preview.purchase_count}\n"
                 f"Сумма: {preview.total_amount:.2f}\n"
+                f"Участников: {len(preview.balances)}\n"
                 f"Переводов: {len(preview.settlements)}\n\n"
                 f"{SETTLEMENT_WARNING}",
                 parent=self.root,
@@ -1097,10 +1214,22 @@ class ExpenseSplitterGui:
         )
         if preview is None:
             return
+        if preview.purchase_count == 0:
+            messagebox.showwarning(
+                "Пустой период",
+                "Период без покупок не создается обычным close flow. "
+                "Скорректируйте даты или используйте отдельный advanced-flow.",
+                parent=self.root,
+            )
+            self.status_var.set("Закрытие пустого периода отменено")
+            return
         if not messagebox.askyesno(
             "Подтверждение",
             f"{SETTLEMENT_WARNING}\n\n"
-            f"Покупок: {preview.purchase_count}\nСумма: {preview.total_amount:.2f}\n\n"
+            f"Покупок: {preview.purchase_count}\n"
+            f"Сумма: {preview.total_amount:.2f}\n"
+            f"Участников: {len(preview.balances)}\n"
+            f"Переводов: {len(preview.settlements)}\n\n"
             "Закрыть период?",
             parent=self.root,
         ):

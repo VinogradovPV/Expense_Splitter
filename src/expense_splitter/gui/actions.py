@@ -53,12 +53,23 @@ from expense_splitter.settlement_period_report import (
     generate_settlement_period_report,
 )
 from expense_splitter.settlement_periods import (
+    DELETE_EMPTY_PERIOD_CONFIRM as SETTLEMENT_DELETE_EMPTY_PERIOD_CONFIRM,
+)
+from expense_splitter.settlement_periods import (
+    DELETE_EMPTY_PERIODS_CONFIRM as SETTLEMENT_DELETE_EMPTY_PERIODS_CONFIRM,
+)
+from expense_splitter.settlement_periods import (
     close_settlement_period,
+    delete_empty_settlement_period,
+    delete_empty_settlement_periods,
     filter_purchases_by_settlement_scope,
     get_settlement_period,
+    is_empty_settlement_period,
     parse_period_date,
     preview_settlement_period,
     reopen_settlement_period,
+    suggest_next_settlement_period,
+    update_settlement_period_metadata,
 )
 from expense_splitter.storage import (
     initialize_data_files,
@@ -75,6 +86,8 @@ from expense_splitter.storage import (
 )
 
 DELETE_CATEGORY_USAGE_CONFIRM = DIRECTORY_DELETE_CATEGORY_USAGE_CONFIRM
+DELETE_EMPTY_PERIOD_CONFIRM = SETTLEMENT_DELETE_EMPTY_PERIOD_CONFIRM
+DELETE_EMPTY_PERIODS_CONFIRM = SETTLEMENT_DELETE_EMPTY_PERIODS_CONFIRM
 
 
 def ensure_data(state: GuiState) -> None:
@@ -357,6 +370,42 @@ def settlement_periods(state: GuiState):
     return load_settlement_periods(state.data_dir / "settlement_periods.yaml")
 
 
+def visible_settlement_periods(
+    state: GuiState,
+    status_filter: str = "all",
+    hide_empty: bool = True,
+):
+    rows = settlement_periods(state)
+    if hide_empty:
+        rows = [period for period in rows if not is_empty_settlement_period(period)]
+    if status_filter == "closed":
+        rows = [period for period in rows if period.status == "closed"]
+    elif status_filter == "reopened":
+        rows = [period for period in rows if period.status == "reopened"]
+    elif status_filter == "empty":
+        rows = [
+            period
+            for period in settlement_periods(state)
+            if is_empty_settlement_period(period)
+        ]
+    elif status_filter == "with_purchases":
+        rows = [period for period in rows if not is_empty_settlement_period(period)]
+    elif status_filter != "all":
+        raise ValueError(
+            "Фильтр периодов должен быть all, closed, reopened, empty или with_purchases."
+        )
+    return rows
+
+
+def is_empty_period(period) -> bool:
+    return is_empty_settlement_period(period)
+
+
+def suggest_close_period(state: GuiState):
+    ensure_data(state)
+    return suggest_next_settlement_period(list_purchases(state), settlement_periods(state))
+
+
 def preview_close_period(state: GuiState, date_from: str, date_to: str):
     return preview_settlement_period(
         list_purchases(state),
@@ -381,6 +430,42 @@ def close_period(state: GuiState, date_from: str, date_to: str, name: str):
     save_purchases(state.data_dir / "purchases.yaml", purchases)
     save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
     return period
+
+
+def edit_period_metadata(
+    state: GuiState,
+    period_id: str,
+    name: str,
+    notes: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    periods = settlement_periods(state)
+    period = update_settlement_period_metadata(
+        periods,
+        period_id,
+        name=name,
+        notes=notes,
+        date_from=parse_period_date(date_from) if date_from else None,
+        date_to=parse_period_date(date_to) if date_to else None,
+    )
+    save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
+    return period
+
+
+def delete_empty_period(state: GuiState, period_id: str, confirm: str):
+    periods = settlement_periods(state)
+    period = delete_empty_settlement_period(periods, period_id, confirm)
+    save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
+    return period
+
+
+def delete_all_empty_periods(state: GuiState, confirm: str):
+    periods = settlement_periods(state)
+    deleted = delete_empty_settlement_periods(periods, confirm)
+    if deleted:
+        save_settlement_periods(state.data_dir / "settlement_periods.yaml", periods)
+    return deleted
 
 
 def settlement_period(state: GuiState, period_id: str):

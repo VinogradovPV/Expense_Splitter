@@ -21,12 +21,18 @@ from expense_splitter.settlement_period_report import (
     generate_settlement_period_report,
 )
 from expense_splitter.settlement_periods import (
+    DELETE_EMPTY_PERIOD_CONFIRM,
+    DELETE_EMPTY_PERIODS_CONFIRM,
     close_settlement_period,
+    delete_empty_settlement_period,
+    delete_empty_settlement_periods,
     filter_purchases_by_settlement_scope,
     get_settlement_period,
     parse_period_date,
     preview_settlement_period,
     reopen_settlement_period,
+    suggest_next_settlement_period,
+    update_settlement_period_metadata,
 )
 from expense_splitter.storage import (
     StorageError,
@@ -351,6 +357,95 @@ def settlement_period_list(data_dir: Path = typer.Option(DATA_DIR, help="Data di
             f"{period.total_amount:.2f}",
         )
     console.print(table)
+
+
+@settlement_period_app.command("suggest")
+def settlement_period_suggest(data_dir: Path = typer.Option(DATA_DIR, help="Data directory")):
+    """Suggest next settlement period close range."""
+    try:
+        purchases = load_purchases(data_dir / "purchases.yaml")
+        periods = load_settlement_periods(data_dir / SETTLEMENT_PERIODS_FILE)
+        suggestion = suggest_next_settlement_period(purchases, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+
+    table = Table("From", "To", "Name", "Reason")
+    table.add_row(
+        suggestion.date_from.isoformat(),
+        suggestion.date_to.isoformat(),
+        suggestion.name,
+        suggestion.reason,
+    )
+    console.print(table)
+
+
+@settlement_period_app.command("rename")
+def settlement_period_rename(
+    settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
+    name: str = typer.Option(..., "--name", help="New settlement period name"),
+    notes: str = typer.Option(None, "--notes", help="Optional notes"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Edit settlement period metadata without changing its snapshot."""
+    try:
+        periods_path = data_dir / SETTLEMENT_PERIODS_FILE
+        periods = load_settlement_periods(periods_path)
+        period = update_settlement_period_metadata(
+            periods,
+            settlement_period_id,
+            name=name,
+            notes=notes,
+        )
+        save_settlement_periods(periods_path, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Updated settlement period {period.id}: {period.name}[/green]")
+
+
+@settlement_period_app.command("delete-empty")
+def settlement_period_delete_empty(
+    settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
+    confirm: str = typer.Option("", "--confirm", help=f"Must be {DELETE_EMPTY_PERIOD_CONFIRM}"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Delete one empty technical settlement period."""
+    try:
+        periods_path = data_dir / SETTLEMENT_PERIODS_FILE
+        periods = load_settlement_periods(periods_path)
+        period = delete_empty_settlement_period(periods, settlement_period_id, confirm)
+        save_settlement_periods(periods_path, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Deleted empty settlement period {period.id}.[/green]")
+
+
+@settlement_period_app.command("delete-empty-all")
+def settlement_period_delete_empty_all(
+    confirm: str = typer.Option("", "--confirm", help=f"Must be {DELETE_EMPTY_PERIODS_CONFIRM}"),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Delete all empty technical settlement periods."""
+    try:
+        periods_path = data_dir / SETTLEMENT_PERIODS_FILE
+        periods = load_settlement_periods(periods_path)
+        deleted = delete_empty_settlement_periods(periods, confirm)
+        if deleted:
+            save_settlement_periods(periods_path, periods)
+    except StorageError as error:
+        handle_storage_error(error)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Deleted empty settlement periods: {len(deleted)}.[/green]")
 
 
 @settlement_period_app.command("show")

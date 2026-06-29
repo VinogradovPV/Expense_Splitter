@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 from expense_splitter.cli import app
 from expense_splitter.models import Group, Participant, Purchase, SettlementPeriod
 from expense_splitter.settlement_periods import (
+    DELETE_EMPTY_PERIOD_CONFIRM,
+    DELETE_EMPTY_PERIODS_CONFIRM,
     close_settlement_period,
     filter_purchases_by_settlement_scope,
     preview_settlement_period,
@@ -297,3 +299,106 @@ def test_cli_close_list_show_reopen_and_scopes(tmp_path):
     assert reopen.exit_code == 0
     purchases = load_purchases(data_dir / "purchases.yaml")
     assert all(not purchase.settled for purchase in purchases)
+
+
+def test_cli_suggest_rename_and_delete_empty_periods(tmp_path):
+    data_dir = tmp_path / "data"
+    initialize_data_files(
+        data_dir,
+        [Participant("Alice"), Participant("Bob")],
+        [Group("All", ["Alice", "Bob"])],
+    )
+    save_purchases(
+        data_dir / "purchases.yaml",
+        [make_purchase("p1", date(2026, 6, 1), "100.00", "Alice", ["Alice", "Bob"])],
+    )
+    empty_period = SettlementPeriod(
+        id="empty",
+        name="Empty",
+        status="closed",
+        date_from=date(2026, 6, 1),
+        date_to=date(2026, 6, 1),
+        closed_at=datetime(2026, 6, 1, 12, 0, 0),
+        purchase_ids=[],
+        total_amount=Decimal("0.00"),
+        settlements=[],
+    )
+    keep_period = SettlementPeriod(
+        id="keep",
+        name="Keep",
+        status="closed",
+        date_from=date(2026, 6, 2),
+        date_to=date(2026, 6, 2),
+        closed_at=datetime(2026, 6, 2, 12, 0, 0),
+        purchase_ids=["p1"],
+        total_amount=Decimal("100.00"),
+        settlements=[],
+    )
+    save_settlement_periods(data_dir / "settlement_periods.yaml", [empty_period, keep_period])
+
+    suggest = runner.invoke(app, ["settlement-period", "suggest", "--data-dir", str(data_dir)])
+    assert suggest.exit_code == 0
+    assert "2026-06-03" in suggest.stdout
+
+    rename = runner.invoke(
+        app,
+        [
+            "settlement-period",
+            "rename",
+            "keep",
+            "--name",
+            "Renamed",
+            "--notes",
+            "safe metadata",
+            "--data-dir",
+            str(data_dir),
+        ],
+    )
+    assert rename.exit_code == 0
+    periods = load_settlement_periods(data_dir / "settlement_periods.yaml")
+    assert next(period for period in periods if period.id == "keep").name == "Renamed"
+
+    blocked = runner.invoke(
+        app,
+        [
+            "settlement-period",
+            "delete-empty",
+            "keep",
+            "--confirm",
+            DELETE_EMPTY_PERIOD_CONFIRM,
+            "--data-dir",
+            str(data_dir),
+        ],
+    )
+    assert blocked.exit_code != 0
+    assert "нельзя удалить" in blocked.stdout
+
+    deleted = runner.invoke(
+        app,
+        [
+            "settlement-period",
+            "delete-empty",
+            "empty",
+            "--confirm",
+            DELETE_EMPTY_PERIOD_CONFIRM,
+            "--data-dir",
+            str(data_dir),
+        ],
+    )
+    assert deleted.exit_code == 0
+    periods = load_settlement_periods(data_dir / "settlement_periods.yaml")
+    assert [period.id for period in periods] == ["keep"]
+
+    delete_all = runner.invoke(
+        app,
+        [
+            "settlement-period",
+            "delete-empty-all",
+            "--confirm",
+            DELETE_EMPTY_PERIODS_CONFIRM,
+            "--data-dir",
+            str(data_dir),
+        ],
+    )
+    assert delete_all.exit_code == 0
+    assert "0" in delete_all.stdout

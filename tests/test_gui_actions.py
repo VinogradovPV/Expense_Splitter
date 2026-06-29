@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
 import pytest
 
@@ -9,6 +10,7 @@ from expense_splitter.gui.dialogs import (
     purchase_input_from_purchase,
 )
 from expense_splitter.gui.state import GuiState
+from expense_splitter.models import SettlementPeriod
 from expense_splitter.storage import (
     load_categories,
     load_groups,
@@ -16,6 +18,7 @@ from expense_splitter.storage import (
     load_purchases,
     load_settlement_periods,
     save_purchases,
+    save_settlement_periods,
 )
 
 
@@ -232,3 +235,45 @@ def test_directory_actions_rename_category_and_update_purchase_filters(tmp_path)
     rows = actions.category_directory_rows(state)
     assert any(row.name == "Meals" and row.total_count == 1 for row in rows)
     assert purchase.id == load_purchases(state.data_dir / "purchases.yaml")[0].id
+
+
+def test_settlement_period_ux_actions_suggest_edit_and_delete_empty(tmp_path):
+    state = make_state(tmp_path)
+    names = actions.participant_names(state)
+    actions.add_purchase(state, "Lunch", "100", names[0], names[:2], "2026-06-25")
+    empty_period = SettlementPeriod(
+        id="empty",
+        name="Empty",
+        status="closed",
+        date_from=date(2026, 6, 1),
+        date_to=date(2026, 6, 1),
+        closed_at=datetime(2026, 6, 1, 12, 0, 0),
+        purchase_ids=[],
+        total_amount=Decimal("0.00"),
+        settlements=[],
+    )
+    save_settlement_periods(state.data_dir / "settlement_periods.yaml", [empty_period])
+
+    suggestion = actions.suggest_close_period(state)
+
+    assert suggestion.date_from == date(2026, 6, 25)
+    assert suggestion.reason == "first_open_purchase_date"
+    updated = actions.edit_period_metadata(
+        state,
+        "empty",
+        "Empty renamed",
+        "technical",
+        "2026-06-02",
+        "2026-06-03",
+    )
+    assert updated.name == "Empty renamed"
+    assert updated.date_from == date(2026, 6, 2)
+    assert list(state.data_dir.glob("settlement_periods.yaml.*.bak"))
+
+    with pytest.raises(ValueError, match=actions.DELETE_EMPTY_PERIOD_CONFIRM):
+        actions.delete_empty_period(state, "empty", "delete")
+
+    deleted = actions.delete_empty_period(state, "empty", actions.DELETE_EMPTY_PERIOD_CONFIRM)
+
+    assert deleted.id == "empty"
+    assert load_settlement_periods(state.data_dir / "settlement_periods.yaml") == []

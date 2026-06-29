@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Iterable, Literal
 
@@ -10,6 +10,8 @@ from expense_splitter.models import Balance, Purchase, Settlement, SettlementPer
 from expense_splitter.settlement import calculate_settlements
 
 SettlementScope = Literal["open", "all"]
+DELETE_EMPTY_PERIOD_CONFIRM = "DELETE_EMPTY_PERIOD"
+DELETE_EMPTY_PERIODS_CONFIRM = "DELETE_EMPTY_PERIODS"
 
 
 @dataclass
@@ -26,6 +28,14 @@ class SettlementPeriodPreview:
         return len(self.purchases)
 
 
+@dataclass(frozen=True)
+class SuggestedPeriod:
+    date_from: date
+    date_to: date
+    name: str
+    reason: str
+
+
 def parse_period_date(value: str) -> date:
     try:
         return date.fromisoformat(value)
@@ -36,6 +46,69 @@ def parse_period_date(value: str) -> date:
 def validate_date_range(date_from: date, date_to: date) -> None:
     if date_from > date_to:
         raise ValueError("--from must not be after --to.")
+
+
+def default_period_name(date_from: date, date_to: date) -> str:
+    if date_from == date_to:
+        return f"Период за {date_from.isoformat()}"
+    return f"Период с {date_from.isoformat()} по {date_to.isoformat()}"
+
+
+def is_empty_settlement_period(period: SettlementPeriod) -> bool:
+    return (
+        len(period.purchase_ids) == 0
+        and period.total_amount == Decimal("0.00")
+        and len(period.settlements) == 0
+    )
+
+
+def is_meaningful_closed_period(period: SettlementPeriod) -> bool:
+    return (
+        period.status == "closed"
+        and len(period.purchase_ids) > 0
+        and period.total_amount > 0
+    )
+
+
+def suggest_next_settlement_period(
+    purchases: Iterable[Purchase],
+    settlement_periods: Iterable[SettlementPeriod],
+    today: date | None = None,
+) -> SuggestedPeriod:
+    current_date = today or date.today()
+    meaningful = [
+        period for period in settlement_periods if is_meaningful_closed_period(period)
+    ]
+    if meaningful:
+        last_period = max(meaningful, key=lambda period: (period.date_to, period.id))
+        date_from = last_period.date_to + timedelta(days=1)
+        return SuggestedPeriod(
+            date_from=date_from,
+            date_to=current_date,
+            name=default_period_name(date_from, current_date),
+            reason="last_meaningful_closed_period",
+        )
+
+    dated_open = [
+        purchase.date
+        for purchase in purchases
+        if not purchase.settled and purchase.date is not None
+    ]
+    if dated_open:
+        date_from = min(dated_open)
+        return SuggestedPeriod(
+            date_from=date_from,
+            date_to=current_date,
+            name=default_period_name(date_from, current_date),
+            reason="first_open_purchase_date",
+        )
+
+    return SuggestedPeriod(
+        date_from=current_date,
+        date_to=current_date,
+        name=default_period_name(current_date, current_date),
+        reason="no_open_purchases",
+    )
 
 
 def filter_purchases_by_settlement_scope(
@@ -122,6 +195,11 @@ def close_settlement_period(
     created_by: str = "cli",
 ) -> SettlementPeriod:
     preview = preview_settlement_period(purchases, all_participants, date_from, date_to)
+    if preview.purchase_count == 0:
+        raise ValueError(
+            "Период без покупок не создается обычным close flow. "
+            "Скорректируйте даты или используйте отдельный advanced-flow."
+        )
     period_id = generate_settlement_period_id(periods, date_to)
     period = SettlementPeriod(
         id=period_id,
@@ -164,3 +242,62 @@ def reopen_settlement_period(
     period.reopened_at = reopened_at or datetime.now()
     period.notes = "Period reopened; purchases returned to open scope."
     return period
+
+
+def update_settlement_period_metadata(
+    periods: list[SettlementPeriod],
+    settlement_period_id: str,
+    *,
+    name: str | None = None,
+    notes: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> SettlementPeriod:
+    period = get_settlement_period(periods, settlement_period_id)
+    has_new_dates = date_from is not None or date_to is not None
+    if has_new_dates and not is_empty_settlement_period(period):
+        raise ValueError(
+            "Даты закрытого периода с покупками нельзя изменить напрямую. "
+            "Переоткройте период и закройте новый диапазон."
+        )
+
+    new_date_from = date_from or period.date_from
+    new_date_to = date_to or period.date_to
+    validate_date_range(new_date_from, new_date_to)
+    period.name = (name or "").strip() or period.name
+    period.notes = notes.strip() if notes is not None else period.notes
+    if is_empty_settlement_period(period):
+        period.date_from = new_date_from
+        period.date_to = new_date_to
+    return period
+
+
+def delete_empty_settlement_period(
+    periods: list[SettlementPeriod],
+    settlement_period_id: str,
+    confirm: str,
+) -> SettlementPeriod:
+    if confirm != DELETE_EMPTY_PERIOD_CONFIRM:
+        raise ValueError("Для удаления введите DELETE_EMPTY_PERIOD без изменений.")
+    period = get_settlement_period(periods, settlement_period_id)
+    if not is_empty_settlement_period(period):
+        raise ValueError(
+            "Период содержит покупки или переводы. Для сохранения истории его нельзя удалить. "
+            "Используйте переоткрытие периода или отчет периода."
+        )
+    periods.remove(period)
+    return period
+
+
+def delete_empty_settlement_periods(
+    periods: list[SettlementPeriod],
+    confirm: str,
+) -> list[SettlementPeriod]:
+    if confirm != DELETE_EMPTY_PERIODS_CONFIRM:
+        raise ValueError("Для удаления введите DELETE_EMPTY_PERIODS без изменений.")
+    deleted = [period for period in periods if is_empty_settlement_period(period)]
+    if not deleted:
+        return []
+    remaining = [period for period in periods if not is_empty_settlement_period(period)]
+    periods[:] = remaining
+    return deleted

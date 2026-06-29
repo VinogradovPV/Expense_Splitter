@@ -1051,3 +1051,33 @@ HTML dashboard и XLSX report остаются P2. Generated reports в `reports
 - Push: `origin/prod-ready/p0-p1`, успешно.
 - GitHub Actions: CI run `27811016567`, success.
 - Generated artifacts: не должны попадать в staging.
+
+## P2.SETTLEMENT-UX.1 — Settlement period UX and empty-period cleanup
+
+Дата: 2026-06-29
+Статус: реализуется локально; финальные проверки, commit, push и CI фиксируются в ответе этапа.
+
+### Цель
+
+Сделать закрытие периода менее ручным и безопаснее: автоматически предлагать следующий диапазон,
+не создавать нулевые периоды в обычном close flow, разрешить безопасное metadata-редактирование и
+дать контролируемую очистку только пустых технических периодов.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/settlement_periods.py` | Добавлены `suggest_next_settlement_period`, правила meaningful/empty period, запрет обычного close без покупок, безопасное metadata-редактирование и удаление только empty periods |
+| `src/expense_splitter/cli.py` | Добавлены `settlement-period suggest`, `rename`, `delete-empty`, `delete-empty-all` |
+| `src/expense_splitter/gui/actions.py` | Добавлены GUI action helpers для suggestion, фильтрации, edit metadata и удаления пустых периодов |
+| `src/expense_splitter/gui/app.py` | Добавлены фильтр периодов, hide-empty toggle, авто-заполнение close dialog, блокировка пустого close, edit/delete empty actions |
+| `src/expense_splitter/gui/dialogs.py` | Добавлены suggestion в close dialog и dialog metadata-редактирования периода |
+| `tests/test_settlement_period_suggestions.py`, `tests/test_settlement_periods.py`, `tests/test_gui_actions.py` | Покрыты suggestion rules, safe edit/delete, CLI и GUI actions |
+| `.gitignore` | Добавлено исключение `data/*.yaml` для локальных пользовательских YAML |
+| `README.md`, `docs/USER_GUIDE.md`, `docs/SETTLEMENT_PERIODS.md`, `docs/DATA_SCHEMA.md`, `docs/Troubleshooting.md` | Описаны UX-правила, CLI/GUI workflow, invariants и troubleshooting |
+
+### Исторические инварианты
+
+Содержательные `closed` periods остаются историческим snapshot: `purchase_ids`, `total_amount`,
+`settlements`, даты и статус не меняются metadata-командами и не пересчитываются. Удалять можно
+только empty periods: без покупок, с нулевой суммой и без переводов.

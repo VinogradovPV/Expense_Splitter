@@ -227,6 +227,27 @@ artifacts собраны в [docs/Troubleshooting.md](docs/Troubleshooting.md).
 Перед commit проверяйте `git status --short --ignored`; не добавляйте `.venv/`, caches, `reports/`,
 `build/`, `dist/`, `*.egg-info/` и `*.bak`.
 
+## Settlement period UX
+
+Вкладка `Периоды взаиморасчетов` автоматически предлагает следующий период закрытия. Если есть
+последний содержательный закрытый период, новый диапазон начинается на следующий день после него.
+Пустые и `reopened` периоды не используются как граница; если содержательных закрытий еще нет,
+берется дата первой открытой покупки, а при отсутствии покупок - сегодняшняя дата.
+
+Обычный close flow не создает нулевые периоды без покупок. Закрытый период с покупками можно
+безопасно переименовать и дополнить notes, но его даты, покупки, сумма и snapshot переводов не
+меняются. Пустые тестовые периоды можно удалить только через typed confirm
+`DELETE_EMPTY_PERIOD` или массово через `DELETE_EMPTY_PERIODS`.
+
+CLI-команды для этих сценариев:
+
+```powershell
+expense-splitter settlement-period suggest
+expense-splitter settlement-period rename settlement_2026_06_30_001 --name "Июнь"
+expense-splitter settlement-period delete-empty settlement_2026_06_30_001 --confirm DELETE_EMPTY_PERIOD
+expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIODS
+```
+
 ## Roadmap
 
 - P2.REL.1 — release quality gate и проверка standalone-сборки;

@@ -71,3 +71,44 @@ Close сохраняет историю и исключает покупки и�
 Для обычного расчётного цикла используйте close; reset предназначен для тестовых данных.
 
 Запись purchases и periods выполняется через storage с timestamped backup и атомарной заменой.
+
+## Автоподстановка следующего периода
+
+GUI и CLI-команда `settlement-period suggest` подбирают следующий диапазон закрытия без изменения
+YAML-данных. Правила:
+
+- если есть последний содержательный `closed` period с покупками и суммой больше нуля, `date_from`
+  равен следующему дню после его `date_to`, а `date_to` равен сегодняшней дате;
+- пустые технические периоды и `reopened` periods не используются как граница для нового закрытия;
+- если содержательных закрытых периодов нет, используется дата первой open-покупки;
+- если open-покупок нет, предлагается период за сегодняшнюю дату.
+
+Имя по умолчанию формируется как `Период с YYYY-MM-DD по YYYY-MM-DD` или
+`Период за YYYY-MM-DD`. Поля остаются редактируемыми перед preview.
+
+```powershell
+expense-splitter settlement-period suggest
+```
+
+## Редактирование и удаление периодов
+
+Содержательный закрытый или переоткрытый период хранит исторический snapshot. Для него разрешены
+только безопасные metadata-изменения: `name` и `notes`. Даты, `purchase_ids`, `total_amount`,
+`settlements` и `status` не редактируются напрямую; если период закрыт ошибочно, используйте
+`reopen` и затем закройте новый корректный диапазон.
+
+Пустой период определяется как запись без `purchase_ids`, с `total_amount: 0.00` и без
+`settlements`. Только такие периоды можно удалить:
+
+```powershell
+expense-splitter settlement-period rename settlement_2026_06_30_001 --name "Новое имя"
+expense-splitter settlement-period delete-empty settlement_2026_06_30_001 --confirm DELETE_EMPTY_PERIOD
+expense-splitter settlement-period delete-empty-all --confirm DELETE_EMPTY_PERIODS
+```
+
+Перед сохранением `settlement_periods.yaml` создается backup. Удаление непустого периода
+запрещено: для сохранения истории используйте reopen или исторический отчет периода.
+
+В GUI таблица периодов по умолчанию скрывает пустые записи. Можно сменить фильтр на
+`empty`, `with_purchases`, `closed`, `reopened` или `all`, отредактировать metadata выбранного
+периода, удалить один пустой период или удалить все пустые тестовые периоды после typed confirm.

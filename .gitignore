@@ -17,3 +17,6 @@ reports/analytics/
 # Generated reports
 reports/
 
+# Local user data
+data/*.yaml
+

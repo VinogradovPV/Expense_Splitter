@@ -43,6 +43,14 @@ class PeriodInput:
     name: str
 
 
+@dataclass
+class PeriodMetadataInput:
+    name: str
+    notes: str
+    date_from: str
+    date_to: str
+
+
 class ChecklistDialog(tk.Toplevel):
     def __init__(
         self,
@@ -263,11 +271,12 @@ class EditPurchaseDialog(PurchaseDialog):
 
 
 class ClosePeriodDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Tk):
+    def __init__(self, parent: tk.Tk, suggested: PeriodInput | None = None):
         super().__init__(parent)
         self.title("Закрыть период")
         self.resizable(False, False)
         self.result: PeriodInput | None = None
+        self.suggested = suggested
         self.transient(parent)
         self.grab_set()
 
@@ -275,6 +284,10 @@ class ClosePeriodDialog(tk.Toplevel):
         self.from_var = tk.StringVar(value=today)
         self.to_var = tk.StringVar(value=today)
         self.name_var = tk.StringVar(value=f"Период до {today}")
+        if suggested is not None:
+            self.from_var.set(suggested.date_from)
+            self.to_var.set(suggested.date_to)
+            self.name_var.set(suggested.name)
 
         rows = (
             ("Дата начала YYYY-MM-DD", self.from_var),
@@ -294,11 +307,78 @@ class ClosePeriodDialog(tk.Toplevel):
         buttons.grid(row=len(rows) + 1, column=0, columnspan=2, sticky="e", padx=8, pady=8)
         ttk.Button(buttons, text="Отмена", command=self.destroy).pack(side="right", padx=4)
         ttk.Button(buttons, text="Preview", command=self._submit).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Автозаполнить период", command=self._apply_suggestion).pack(
+            side="right", padx=4
+        )
+
+    def _apply_suggestion(self) -> None:
+        if self.suggested is None:
+            return
+        self.from_var.set(self.suggested.date_from)
+        self.to_var.set(self.suggested.date_to)
+        self.name_var.set(self.suggested.name)
 
     def _submit(self) -> None:
         self.result = PeriodInput(
             date_from=self.from_var.get().strip(),
             date_to=self.to_var.get().strip(),
             name=self.name_var.get().strip(),
+        )
+        self.destroy()
+
+
+class PeriodMetadataDialog(tk.Toplevel):
+    def __init__(self, parent: tk.Tk, period, allow_dates: bool):
+        super().__init__(parent)
+        self.title("Редактировать период")
+        self.resizable(False, False)
+        self.result: PeriodMetadataInput | None = None
+        self.transient(parent)
+        self.grab_set()
+        self.allow_dates = allow_dates
+
+        self.name_var = tk.StringVar(value=period.name)
+        self.notes_var = tk.StringVar(value=period.notes or "")
+        self.from_var = tk.StringVar(value=period.date_from.isoformat())
+        self.to_var = tk.StringVar(value=period.date_to.isoformat())
+
+        rows = (
+            ("Название периода", self.name_var, True),
+            ("Notes", self.notes_var, True),
+            ("Дата начала YYYY-MM-DD", self.from_var, allow_dates),
+            ("Дата окончания YYYY-MM-DD", self.to_var, allow_dates),
+        )
+        for index, (label, variable, enabled) in enumerate(rows):
+            ttk.Label(self, text=label).grid(row=index, column=0, sticky="w", padx=8, pady=4)
+            state = "normal" if enabled else "disabled"
+            ttk.Entry(self, textvariable=variable, width=48, state=state).grid(
+                row=index,
+                column=1,
+                sticky="ew",
+                padx=8,
+                pady=4,
+            )
+
+        if not allow_dates:
+            ttk.Label(
+                self,
+                text=(
+                    "Даты закрытого периода с покупками нельзя изменить напрямую. "
+                    "Переоткройте период и закройте новый диапазон."
+                ),
+                wraplength=460,
+            ).grid(row=len(rows), column=0, columnspan=2, sticky="w", padx=8, pady=8)
+
+        buttons = ttk.Frame(self)
+        buttons.grid(row=len(rows) + 1, column=0, columnspan=2, sticky="e", padx=8, pady=8)
+        ttk.Button(buttons, text="Отмена", command=self.destroy).pack(side="right", padx=4)
+        ttk.Button(buttons, text="Сохранить", command=self._submit).pack(side="right", padx=4)
+
+    def _submit(self) -> None:
+        self.result = PeriodMetadataInput(
+            name=self.name_var.get().strip(),
+            notes=self.notes_var.get().strip(),
+            date_from=self.from_var.get().strip(),
+            date_to=self.to_var.get().strip(),
         )
         self.destroy()
