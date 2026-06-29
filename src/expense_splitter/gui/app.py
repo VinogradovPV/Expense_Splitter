@@ -18,6 +18,17 @@ from expense_splitter.gui.dialogs import (
 )
 from expense_splitter.gui.state import GuiState
 from expense_splitter.gui.widgets import clear_tree, make_tree
+from expense_splitter.ui_labels import (
+    label_for_period_filter,
+    label_for_period_status,
+    label_for_purchase_filter,
+    label_for_report_format,
+    label_for_scope,
+)
+
+PURCHASE_FILTER_VALUES = ("all", "open", "settled")
+PERIOD_FILTER_VALUES = ("all", "closed", "reopened", "empty", "with_purchases")
+REPORT_FORMAT_VALUES = ("markdown", "csv", "png", "html", "xlsx", "pdf", "all")
 
 
 class ExpenseSplitterGui:
@@ -51,14 +62,14 @@ class ExpenseSplitterGui:
         self.notebook.add(tab, text="Покупки")
         toolbar = ttk.Frame(tab)
         toolbar.pack(fill="x", padx=6, pady=6)
-        self.period_status_filter_var = tk.StringVar(value="all")
+        self.period_status_filter_var = tk.StringVar(value=label_for_period_filter("all"))
         self.hide_empty_periods_var = tk.BooleanVar(value=True)
         ttk.Combobox(
             toolbar,
             textvariable=self.period_status_filter_var,
-            values=("all", "closed", "reopened", "empty", "with_purchases"),
+            values=tuple(label_for_period_filter(value) for value in PERIOD_FILTER_VALUES),
             state="readonly",
-            width=16,
+            width=24,
         ).pack(side="left", padx=6)
         ttk.Checkbutton(
             toolbar,
@@ -84,13 +95,17 @@ class ExpenseSplitterGui:
         )
         filters = ttk.LabelFrame(tab, text="Фильтры")
         filters.pack(fill="x", padx=6, pady=(0, 6))
-        self.purchase_status_var = tk.StringVar(value="all")
+        self.purchase_status_var = tk.StringVar(value=label_for_purchase_filter("all"))
         self.purchase_category_filter_var = tk.StringVar()
         self.purchase_from_var = tk.StringVar()
         self.purchase_to_var = tk.StringVar()
         self.purchase_search_var = tk.StringVar()
         filter_specs = (
-            ("Статус", self.purchase_status_var, ("all", "open", "settled")),
+            (
+                "Статус",
+                self.purchase_status_var,
+                tuple(label_for_purchase_filter(value) for value in PURCHASE_FILTER_VALUES),
+            ),
             (
                 "Категория",
                 self.purchase_category_filter_var,
@@ -173,8 +188,11 @@ class ExpenseSplitterGui:
         ttk.Label(tab, textvariable=self.scope_label_var, wraplength=900).pack(anchor="w", padx=6)
         pane = ttk.PanedWindow(tab, orient="horizontal")
         pane.pack(fill="both", expand=True, padx=6, pady=6)
-        balances_frame = ttk.LabelFrame(pane, text="Балансы open scope")
-        settlements_frame = ttk.LabelFrame(pane, text="Итоговые переводы open scope")
+        balances_frame = ttk.LabelFrame(pane, text=f"Балансы: {label_for_scope('open')}")
+        settlements_frame = ttk.LabelFrame(
+            pane,
+            text=f"Итоговые переводы: {label_for_scope('open')}",
+        )
         pane.add(balances_frame, weight=1)
         pane.add(settlements_frame, weight=1)
         self.balances_tree = make_tree(balances_frame, ("Участник", "Оплатил", "Доля", "Баланс"))
@@ -253,7 +271,7 @@ class ExpenseSplitterGui:
         self.analytics_year_var = tk.StringVar(value=str(date.today().year))
         self.analytics_month_var = tk.StringVar(value=str(date.today().month))
         self.analytics_quarter_var = tk.StringVar(value="1")
-        self.analytics_format_var = tk.StringVar(value="all")
+        self.analytics_format_var = tk.StringVar(value=label_for_report_format("all"))
         self.last_analytics_report_dir: Path | None = None
         self.last_report_status_var = tk.StringVar(value="Отчёт ещё не создавался")
         rows = (
@@ -264,7 +282,7 @@ class ExpenseSplitterGui:
             (
                 "Формат",
                 self.analytics_format_var,
-                ("markdown", "csv", "png", "html", "xlsx", "pdf", "all"),
+                tuple(label_for_report_format(value) for value in REPORT_FORMAT_VALUES),
             ),
         )
         for row, (label, variable, values) in enumerate(rows):
@@ -433,7 +451,7 @@ class ExpenseSplitterGui:
             "1.0",
             "Expense Splitter GUI\n\n"
             "Покупки не удаляются при закрытии периода. Закрытие создает снимок "
-            "взаиморасчетов и исключает выбранные покупки из текущего open scope.\n\n"
+            "взаиморасчетов и исключает выбранные покупки из текущих открытых расчетов.\n\n"
             "Сброс тестовых данных — отдельная операция: после typed confirm она создает "
             "backup и очищает покупки и периоды, сохраняя участников, группы и категории.\n\n"
             "HTML и XLSX отчеты будут доступны после соответствующих этапов P2.A.",
@@ -457,6 +475,39 @@ class ExpenseSplitterGui:
         self.refresh_periods()
         self.refresh_directories()
 
+    def _purchase_filter_value(self) -> str:
+        selected = self.purchase_status_var.get()
+        return next(
+            (
+                value
+                for value in PURCHASE_FILTER_VALUES
+                if selected == label_for_purchase_filter(value)
+            ),
+            selected,
+        )
+
+    def _period_filter_value(self) -> str:
+        selected = self.period_status_filter_var.get()
+        return next(
+            (
+                value
+                for value in PERIOD_FILTER_VALUES
+                if selected == label_for_period_filter(value)
+            ),
+            selected,
+        )
+
+    def _report_format_value(self) -> str:
+        selected = self.analytics_format_var.get()
+        return next(
+            (
+                value
+                for value in REPORT_FORMAT_VALUES
+                if selected == label_for_report_format(value)
+            ),
+            selected,
+        )
+
     def refresh_purchases(self) -> None:
         def action():
             if hasattr(self, "purchase_category_filter_combo"):
@@ -466,7 +517,7 @@ class ExpenseSplitterGui:
             clear_tree(self.purchases_tree)
             purchases = actions.filter_and_sort_purchases(
                 actions.list_purchases(self.state),
-                status=self.purchase_status_var.get(),
+                status=self._purchase_filter_value(),
                 category=self.purchase_category_filter_var.get(),
                 date_from=self.purchase_from_var.get().strip(),
                 date_to=self.purchase_to_var.get().strip(),
@@ -474,12 +525,15 @@ class ExpenseSplitterGui:
                 sort_by=self.purchase_sort_by,
                 descending=self.purchase_sort_desc,
             )
+            period_names = {
+                period.id: period.name for period in actions.settlement_periods(self.state)
+            }
             for purchase in purchases:
                 self.purchases_tree.insert(
                     "",
                     "end",
                     iid=purchase.id,
-                    values=actions.purchase_row(purchase),
+                    values=actions.purchase_row(purchase, period_names),
                 )
 
         self.run_safely(action, "Покупки обновлены")
@@ -514,7 +568,8 @@ class ExpenseSplitterGui:
             f"Участники: {', '.join(purchase.participants)}\n"
             f"Категория: {purchase.category or 'Без категории'}\n"
             f"Комментарий: {purchase.comment or '—'}\n"
-            f"Статус: {'settled' if purchase.settled else 'open'}",
+            f"Статус: {actions.purchase_status_label(purchase)}\n"
+            f"Служебная информация: {purchase.settlement_period_id or 'нет'}",
             parent=self.root,
         )
 
@@ -574,9 +629,11 @@ class ExpenseSplitterGui:
         def action():
             scope = self.calculation_scope_var.get()
             self.scope_label_var.set(
-                "Scope: open — закрытые покупки не входят в текущие расчёты."
+                "Текущий режим: открытые покупки. "
+                "Закрытые покупки не входят в текущие расчёты."
                 if scope == "open"
-                else "Scope: all — показан расчёт по всей истории, включая закрытые покупки."
+                else "Текущий режим: все покупки с историей. "
+                "Показан расчёт по всей истории, включая закрытые покупки."
             )
             clear_tree(self.balances_tree)
             for balance in actions.balances(self.state, scope):
@@ -663,7 +720,7 @@ class ExpenseSplitterGui:
             clear_tree(self.periods_tree)
             for period in actions.visible_settlement_periods(
                 self.state,
-                self.period_status_filter_var.get(),
+                self._period_filter_value(),
                 self.hide_empty_periods_var.get(),
             ):
                 self.periods_tree.insert(
@@ -673,7 +730,7 @@ class ExpenseSplitterGui:
                     values=(
                         period.id,
                         period.name,
-                        period.status,
+                        label_for_period_status(period.status),
                         period.date_from.isoformat(),
                         period.date_to.isoformat(),
                         len(period.purchase_ids),
@@ -971,7 +1028,8 @@ class ExpenseSplitterGui:
         )
         messagebox.showinfo(
             "Детали периода",
-            f"ID: {period.id}\nНазвание: {period.name}\nСтатус: {period.status}\n"
+            f"ID: {period.id}\nНазвание: {period.name}\n"
+            f"Статус: {label_for_period_status(period.status)}\n"
             f"Даты: {period.date_from} — {period.date_to}\n"
             f"Покупок: {len(period.purchase_ids)}\nСумма: {period.total_amount:.2f}\n\n"
             f"Переводы:\n{transfers}",
@@ -1280,7 +1338,7 @@ class ExpenseSplitterGui:
             year = int(self.analytics_year_var.get())
             month = int(self.analytics_month_var.get()) if period == "month" else None
             quarter = int(self.analytics_quarter_var.get()) if period == "quarter" else None
-            output_format = self.analytics_format_var.get()
+            output_format = self._report_format_value()
             return actions.generate_analytics(
                 self.state,
                 period,
@@ -1294,7 +1352,8 @@ class ExpenseSplitterGui:
         if report_dir:
             self.last_analytics_report_dir = report_dir
             self.last_report_status_var.set(
-                f"Последний отчёт: {report_dir} ({self.analytics_format_var.get()})"
+                f"Последний отчёт: {report_dir} "
+                f"({label_for_report_format(self._report_format_value())})"
             )
             messagebox.showinfo("Отчет создан", f"Папка отчета:\n{report_dir}", parent=self.root)
 

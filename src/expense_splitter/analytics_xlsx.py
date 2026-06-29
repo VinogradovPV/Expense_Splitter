@@ -10,17 +10,18 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from expense_splitter.analytics import AnalyticsDataset
+from expense_splitter.ui_labels import label_for_report_sheet
 
 SHEETS = (
-    ("Summary", "summary.csv"),
-    ("Purchases", "purchases.csv"),
-    ("By Category", "by_category.csv"),
-    ("By Payer", "by_payer.csv"),
-    ("By Participant", "by_participant.csv"),
-    ("Balances", "balances.csv"),
-    ("Settlements", "settlements.csv"),
-    ("Top Purchases", "top_purchases.csv"),
-    ("Warnings", "warnings.csv"),
+    (label_for_report_sheet("Summary"), "summary.csv"),
+    (label_for_report_sheet("Purchases"), "purchases.csv"),
+    (label_for_report_sheet("By Category"), "by_category.csv"),
+    (label_for_report_sheet("By Payer"), "by_payer.csv"),
+    (label_for_report_sheet("By Participant"), "by_participant.csv"),
+    (label_for_report_sheet("Balances"), "balances.csv"),
+    (label_for_report_sheet("Settlements"), "settlements.csv"),
+    (label_for_report_sheet("Top Purchases"), "top_purchases.csv"),
+    (label_for_report_sheet("Warnings"), "warnings.csv"),
 )
 
 MONEY_HEADERS = {"Сумма", "Оплачено", "Доля расходов", "Доля", "Баланс"}
@@ -51,7 +52,7 @@ def write_xlsx_report(
         worksheet = workbook.create_sheet(sheet_name)
         _write_table_sheet(worksheet, sheet_name, rows)
 
-    charts_sheet = workbook.create_sheet("Charts")
+    charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
     _write_charts_sheet(charts_sheet, charts_dir)
     workbook.active = 0
     workbook.calculation.fullCalcOnLoad = True
@@ -111,7 +112,7 @@ def _write_table_sheet(worksheet, sheet_name: str, rows: list[list[str]]) -> Non
             for cell in worksheet[row_index]:
                 cell.fill = PatternFill("solid", fgColor="F7FAFC")
 
-    if sheet_name == "Warnings":
+    if sheet_name == label_for_report_sheet("Warnings"):
         for row in worksheet.iter_rows(min_row=4, max_row=last_row):
             for cell in row:
                 cell.fill = PatternFill("solid", fgColor=WARNING)
@@ -190,14 +191,14 @@ def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
 
 def _sheet_title(sheet_name: str) -> str:
     titles = {
-        "Summary": "Сводка аналитики",
-        "Purchases": "Покупки",
-        "By Category": "Расходы по категориям",
-        "By Payer": "Расходы по плательщикам",
-        "By Participant": "Доли участников",
-        "Balances": "Балансы",
-        "Settlements": "Переводы",
-        "Top Purchases": "Крупнейшие покупки",
-        "Warnings": "Предупреждения",
+        label_for_report_sheet("Summary"): "Сводка аналитики",
+        label_for_report_sheet("Purchases"): "Покупки",
+        label_for_report_sheet("By Category"): "Расходы по категориям",
+        label_for_report_sheet("By Payer"): "Расходы по плательщикам",
+        label_for_report_sheet("By Participant"): "Доли участников",
+        label_for_report_sheet("Balances"): "Балансы участников",
+        label_for_report_sheet("Settlements"): "Переводы",
+        label_for_report_sheet("Top Purchases"): "Крупнейшие покупки",
+        label_for_report_sheet("Warnings"): "Предупреждения",
     }
     return titles[sheet_name]

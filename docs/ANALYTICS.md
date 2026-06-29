@@ -24,6 +24,10 @@ expense-splitter current-report --scope all --format xlsx
 Default: `--scope open --format all`. Закрытые покупки не входят в `open`; отчет не закрывает
 период, не помечает покупки settled и не меняет YAML-данные.
 
+В визуальных отчетах `open` отображается как `Открытые покупки`, `all` как `Все покупки с
+историей`, а `snapshot` как `Дата формирования отчета`. CLI и `metadata.json` сохраняют
+технические значения для совместимости.
+
 Output:
 
 ```text
@@ -118,10 +122,11 @@ reports/analytics/<year>/<period-id>/
 
 ## XLSX
 
-Книга содержит листы Summary, Purchases, By Category, By Payer, By Participant, Balances,
-Settlements, Top Purchases, Warnings и Charts. Денежные значения записываются числами с форматом
-`#,##0.00`. Табличные листы имеют freeze panes и auto-filter. Для совместимости с Microsoft Excel
-используются обычные диапазоны без `xl/tables` XML; на Charts вставляются готовые PNG.
+Книга содержит русские листы `Сводка`, `Покупки`, `По категориям`, `По плательщикам`,
+`По участникам`, `Балансы участников`, `Итоговые переводы`, `Крупнейшие покупки`,
+`Предупреждения` и `Графики`. Денежные значения записываются числами с форматом `#,##0.00`.
+Табличные листы имеют freeze panes и auto-filter. Для совместимости с Microsoft Excel используются
+обычные диапазоны без `xl/tables` XML; на лист `Графики` вставляются готовые PNG.
 
 ## Generated artifacts
 

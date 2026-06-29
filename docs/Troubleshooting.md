@@ -40,6 +40,9 @@ expense-splitter current-report --scope open --format all
 
 HTML находится в `reports/current_state/open_<timestamp>/current_state_dashboard.html`.
 
+В GUI и визуальных отчетах `open` отображается как `Открытые покупки`, а `snapshot` как
+`Дата формирования отчета`. В CLI и `metadata.json` технические значения сохраняются намеренно.
+
 Для отчета конкретного settlement period сначала выберите период в GUI и нажмите
 `Создать отчет периода` либо выполните:
 
@@ -125,7 +128,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 тестовые и `reopened` periods намеренно игнорируются.
 
 Непустой period удалить нельзя: это исторический snapshot. Используйте `Переоткрыть период`,
-если покупки нужно вернуть в open scope, или создайте отчет периода для просмотра истории.
+если покупки нужно вернуть в открытые расчеты, или создайте отчет периода для просмотра истории.
 Пустые технические периоды удаляются только с typed confirm:
 
 ```powershell

@@ -84,6 +84,10 @@ from expense_splitter.storage import (
 from expense_splitter.storage import (
     reset_test_data as storage_reset_test_data,
 )
+from expense_splitter.ui_labels import (
+    label_for_missing_purchase_period,
+    label_for_purchase_status,
+)
 
 DELETE_CATEGORY_USAGE_CONFIRM = DIRECTORY_DELETE_CATEGORY_USAGE_CONFIRM
 DELETE_EMPTY_PERIOD_CONFIRM = SETTLEMENT_DELETE_EMPTY_PERIOD_CONFIRM
@@ -171,7 +175,11 @@ def filter_and_sort_purchases(
     return sorted(result, key=keys[sort_by], reverse=descending)
 
 
-def purchase_row(purchase: Purchase) -> tuple[str, ...]:
+def purchase_row(
+    purchase: Purchase,
+    period_names: dict[str, str] | None = None,
+) -> tuple[str, ...]:
+    status = purchase_status_label(purchase, period_names)
     return (
         purchase.date.isoformat() if purchase.date else "",
         purchase.purchase_name,
@@ -179,8 +187,24 @@ def purchase_row(purchase: Purchase) -> tuple[str, ...]:
         purchase.payer,
         ", ".join(purchase.participants),
         purchase.category or "Без категории",
-        purchase.settlement_period_id if purchase.settled else "open",
+        status,
     )
+
+
+def purchase_status_label(
+    purchase: Purchase,
+    period_names: dict[str, str] | None = None,
+) -> str:
+    if not (purchase.settled or purchase.settlement_period_id):
+        return label_for_purchase_status("open")
+    if not purchase.settlement_period_id:
+        return label_for_purchase_status("settled")
+    if period_names is None:
+        return label_for_missing_purchase_period()
+    period_name = period_names.get(purchase.settlement_period_id)
+    if not period_name:
+        return label_for_missing_purchase_period()
+    return label_for_purchase_status("settled", period_name)
 
 
 def category_names(state: GuiState) -> list[str]:

@@ -154,22 +154,22 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
 
     markdown = (report_dir / "current_state_report.md").read_text(encoding="utf-8")
     assert "# Отчет по текущим взаиморасчетам" in markdown
-    assert "Scope: open" in markdown
+    assert "Какие покупки включены: Открытые покупки" in markdown
     html = (report_dir / "current_state_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="UTF-8">' in html
     assert "Отчет по текущим взаиморасчетам" in html
 
     workbook = load_workbook(report_dir / "current_state.xlsx")
     assert workbook.sheetnames == [
-        "Summary",
-        "Purchases",
-        "By Category",
-        "By Payer",
-        "By Participant",
-        "Balances",
-        "Settlements",
-        "Warnings",
-        "Charts",
+        "Сводка",
+        "Покупки",
+        "По категориям",
+        "По плательщикам",
+        "По участникам",
+        "Балансы участников",
+        "Итоговые переводы",
+        "Предупреждения",
+        "Графики",
     ]
 
 

@@ -133,8 +133,8 @@ def test_report(temp_data_dir):
     assert result.exit_code == 0
     assert report_path.exists()
     content = report_path.read_text(encoding="utf-8")
-    assert "# Expense Splitter Report" in content
-    assert "Summary of Balances" in content
+    assert "# Отчет Expense Splitter" in content
+    assert "Сводка балансов" in content
     assert "Кофе в офис" in content
     assert "Павел" in content
 

@@ -1100,3 +1100,24 @@ HTML dashboard и XLSX report остаются P2. Generated reports в `reports
 
 PDF создается нативно через ReportLab и локальный кириллический шрифт; browser print и heavy
 browser dependencies не используются.
+
+## P2.UX-RU.1 — Русификация пользовательских терминов
+
+Дата: 2026-06-29
+Статус: реализуется локально; финальные проверки, commit, push и CI фиксируются в ответе этапа.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/ui_labels.py` | Добавлен единый слой русских пользовательских подписей для scope, статусов, фильтров, report fields, sheet names и formats |
+| GUI | Фильтры покупок/периодов и формат analytics показывают русские подписи; таблица покупок скрывает raw `settlement_period_id` в основном статусе |
+| Current/settlement/analytics reports | Markdown, HTML, PDF и XLSX используют русские summary labels, status/scope values и русские имена листов |
+| `src/expense_splitter/reporting.py` | Legacy Markdown report переведен на русские видимые заголовки |
+| Tests | Добавлены проверки `ui_labels`, GUI labels и report labels |
+
+### Инварианты
+
+CLI options, YAML schema и `metadata.json` сохраняют технические значения `open/all/closed/reopened`
+для совместимости и автоматизации. CSV может содержать технические machine-readable поля вроде
+`payer_total` и `payer_rank`; визуальные отчеты показывают пользовательские русские подписи.

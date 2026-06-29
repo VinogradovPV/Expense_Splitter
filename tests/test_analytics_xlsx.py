@@ -14,16 +14,16 @@ from expense_splitter.storage import initialize_data_files, save_purchases
 
 runner = CliRunner()
 EXPECTED_SHEETS = [
-    "Summary",
-    "Purchases",
-    "By Category",
-    "By Payer",
-    "By Participant",
-    "Balances",
-    "Settlements",
-    "Top Purchases",
-    "Warnings",
-    "Charts",
+    "Сводка",
+    "Покупки",
+    "По категориям",
+    "По плательщикам",
+    "По участникам",
+    "Балансы участников",
+    "Итоговые переводы",
+    "Крупнейшие покупки",
+    "Предупреждения",
+    "Графики",
 ]
 
 
@@ -55,13 +55,13 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     workbook = load_workbook(path)
 
     assert workbook.sheetnames == EXPECTED_SHEETS
-    summary = workbook["Summary"]
+    summary = workbook["Сводка"]
     assert summary["A1"].value == "Сводка аналитики"
     assert any(cell.value == "ID периода" for row in summary.iter_rows() for cell in row)
     assert any(cell.value == "2026-06" for row in summary.iter_rows() for cell in row)
     assert any(cell.value == 120.5 for row in summary.iter_rows() for cell in row)
 
-    purchases = workbook["Purchases"]
+    purchases = workbook["Покупки"]
     headers = [cell.value for cell in purchases[3]]
     values = [cell.value for cell in purchases[4]]
     assert "Наименование покупки" in headers
@@ -74,7 +74,7 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     assert amount_cell.number_format == "#,##0.00"
     assert purchases.freeze_panes == "A4"
     assert purchases.auto_filter.ref
-    assert len(workbook["Charts"]._images) == 6
+    assert len(workbook["Графики"]._images) == 6
     with ZipFile(path) as archive:
         assert not any(name.startswith("xl/tables/") for name in archive.namelist())
 
@@ -83,9 +83,11 @@ def test_xlsx_empty_period_has_warnings_and_chart_message(tmp_path):
     report_dir = generate_analytics_report(dataset(False), tmp_path, "xlsx")
     workbook = load_workbook(report_dir / "expense_analytics_2026-06.xlsx")
 
-    assert "Warnings" in workbook.sheetnames
-    assert workbook["Warnings"].max_row >= 4
-    assert workbook["Charts"]["A3"].value == ("Графики не созданы: нет данных за выбранный период.")
+    assert "Предупреждения" in workbook.sheetnames
+    assert workbook["Предупреждения"].max_row >= 4
+    assert workbook["Графики"]["A3"].value == (
+        "Графики не созданы: нет данных за выбранный период."
+    )
 
 
 def test_all_format_includes_xlsx(tmp_path):

@@ -36,10 +36,13 @@ expense-splitter balances --scope all
 expense-splitter settle --settlement-period settlement_2026_06_30_001
 ```
 
-`expense-splitter current-report --scope open --format all` использует тот же open scope, но
+`expense-splitter current-report --scope open --format all` использует тот же набор открытых покупок, но
 только строит отчет о текущем состоянии взаиморасчетов. Команда не закрывает период, не меняет
 `settled` и не записывает `settlement_period_id`. Для фиксации периода используйте
 `settlement-period close`.
+
+В GUI этот режим отображается как `Открытые покупки`, а режим `all` как `Все покупки с историей`.
+CLI сохраняет технические значения `open/all`, потому что они являются параметрами команд.
 
 ## Отчет периода
 
@@ -59,6 +62,10 @@ expense-splitter settle --settlement-period settlement_2026_06_30_001
 `settlement_period_report.md`, `settlement_period_dashboard.html`, `settlement_period.xlsx`,
 `metadata.json`, таблицы `tables/*.csv` и графики `charts/*.png`. Если период был `reopened`, в
 warnings будет пояснение, что отчет показывает сохраненный snapshot периода.
+
+В Markdown/HTML/PDF/XLSX статус периода отображается по-русски: `closed` как `Закрыт`,
+`reopened` как `Переоткрыт`. Raw `settlement_period_id` остается в metadata, CSV и деталях периода,
+но основной статус покупки в GUI показывает название периода или сообщение `период не найден`.
 
 В GUI выберите строку на вкладке `Периоды взаиморасчетов`, нажмите `Создать отчет периода`, затем
 используйте `Открыть HTML отчета периода`, `Открыть XLSX отчета периода` или

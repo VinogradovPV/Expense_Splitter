@@ -229,15 +229,15 @@ def test_settlement_period_report_files_are_readable(tmp_path):
 
     workbook = load_workbook(report_dir / "settlement_period.xlsx")
     assert workbook.sheetnames == [
-        "Summary",
-        "Purchases",
-        "By Category",
-        "By Payer",
-        "By Participant",
-        "Balances",
-        "Settlements",
-        "Warnings",
-        "Charts",
+        "Сводка",
+        "Покупки",
+        "По категориям",
+        "По плательщикам",
+        "По участникам",
+        "Балансы участников",
+        "Итоговые переводы",
+        "Предупреждения",
+        "Графики",
     ]
 
 

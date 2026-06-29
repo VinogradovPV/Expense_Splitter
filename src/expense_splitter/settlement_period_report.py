@@ -42,6 +42,12 @@ from expense_splitter.models import (
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.settlement_periods import get_settlement_period
+from expense_splitter.ui_labels import (
+    label_for_period_status,
+    label_for_purchase_status,
+    label_for_report_field,
+    label_for_report_sheet,
+)
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
 CSV_ENCODING = "utf-8-sig"
@@ -57,7 +63,7 @@ TABLE_SPECS = (
     ("by_participant.csv", "Доли участников"),
     ("balances.csv", "Балансы"),
     ("settlements.csv", "Итоговые переводы"),
-    ("warnings.csv", "Warnings"),
+    ("warnings.csv", "Предупреждения"),
 )
 
 SETTLEMENT_PERIOD_PDF_TABLES = (
@@ -68,7 +74,7 @@ SETTLEMENT_PERIOD_PDF_TABLES = (
     PdfTableSpec("balances.csv", "Балансы"),
     PdfTableSpec("settlements.csv", "Итоговые переводы"),
     PdfTableSpec("purchases.csv", "Покупки периода"),
-    PdfTableSpec("warnings.csv", "Warnings"),
+    PdfTableSpec("warnings.csv", "Предупреждения"),
 )
 
 
@@ -321,13 +327,16 @@ def write_settlement_period_markdown(
     lines = [
         f"# {REPORT_TITLE}",
         "",
-        f"Settlement period ID: {period.id}",
+        f"{label_for_report_field('Settlement period ID')}: {period.id}",
         f"Название: {period.name}",
-        f"Статус: {period.status}",
+        f"Статус: {label_for_period_status(period.status)}",
         f"Даты: {period.date_from.isoformat()} — {period.date_to.isoformat()}",
-        f"Closed at: {period.closed_at.isoformat(timespec='seconds')}",
-        f"Reopened at: {_serialize(period.reopened_at)}",
-        f"Snapshot: {dataset.generated_at.isoformat(timespec='seconds')}",
+        f"{label_for_report_field('Closed at')}: {period.closed_at.isoformat(timespec='seconds')}",
+        f"{label_for_report_field('Reopened at')}: {_serialize(period.reopened_at)}",
+        (
+            f"{label_for_report_field('Snapshot')}: "
+            f"{dataset.generated_at.isoformat(timespec='seconds')}"
+        ),
         "",
         "## Сводка",
         "",
@@ -338,7 +347,7 @@ def write_settlement_period_markdown(
         f"| Средний чек | {_serialize(summary['average_purchase'])} |",
         f"| Количество участников | {summary['participant_count']} |",
         f"| Количество итоговых переводов | {summary['settlement_count']} |",
-        f"| Статус периода | {summary['status']} |",
+        f"| Статус периода | {label_for_period_status(str(summary['status']))} |",
         "",
     ]
     if not dataset.purchases:
@@ -400,7 +409,7 @@ def write_settlement_period_markdown(
     )
     _append_markdown_table(
         lines,
-        "Warnings",
+        "Предупреждения",
         ["Тип", "ID покупки", "Покупка", "Сообщение"],
         _warning_rows(warnings),
     )
@@ -430,7 +439,7 @@ def write_settlement_period_html(
         ("Средний чек", _serialize(summary["average_purchase"])),
         ("Участников", str(summary["participant_count"])),
         ("Переводов", str(summary["settlement_count"])),
-        ("Статус", str(summary["status"])),
+        ("Статус", label_for_period_status(str(summary["status"]))),
     )
     card_html = "".join(
         f'<div class="card"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
@@ -452,6 +461,11 @@ def write_settlement_period_html(
         '<p class="empty">Период не содержит покупок.</p>' if not dataset.purchases else ""
     )
     reopened_at = _serialize(period.reopened_at)
+    closed_at_label = escape(label_for_report_field("Closed at"))
+    reopened_at_label = escape(label_for_report_field("Reopened at"))
+    snapshot_label = escape(label_for_report_field("Snapshot"))
+    closed_at_value = escape(period.closed_at.isoformat(timespec="seconds"))
+    snapshot_value = escape(dataset.generated_at.isoformat(timespec="seconds"))
     document = f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -460,13 +474,13 @@ def write_settlement_period_html(
 <header><h1>{escape(REPORT_TITLE)}</h1>
 <p class="meta">ID: {escape(period.id)}<br>
 Название: {escape(period.name)}<br>
-Статус: {escape(period.status)}<br>
+Статус: {escape(label_for_period_status(period.status))}<br>
 Даты: {escape(period.date_from.isoformat())} — {escape(period.date_to.isoformat())}<br>
-Closed at: {escape(period.closed_at.isoformat(timespec='seconds'))}<br>
-Reopened at: {escape(reopened_at)}<br>
-Snapshot: {escape(dataset.generated_at.isoformat(timespec='seconds'))}</p></header>
+{closed_at_label}: {closed_at_value}<br>
+{reopened_at_label}: {escape(reopened_at)}<br>
+{snapshot_label}: {snapshot_value}</p></header>
 <section><h2>Сводка</h2>{empty_note}<div class="cards">{card_html}</div></section>
-<section><h2>Warnings</h2><div class="panel warning">{warnings_html}</div></section>
+<section><h2>Предупреждения</h2><div class="panel warning">{warnings_html}</div></section>
 <section><h2>Графики</h2>{chart_html}</section>
 <section><h2>Таблицы</h2>{table_html}</section>
 <section><h2>Файлы</h2><div class="panel links">
@@ -483,19 +497,19 @@ def write_settlement_period_xlsx(path: Path, tables_dir: Path, charts_dir: Path)
     workbook = Workbook()
     workbook.remove(workbook.active)
     sheets = (
-        ("Summary", "summary.csv"),
-        ("Purchases", "purchases.csv"),
-        ("By Category", "by_category.csv"),
-        ("By Payer", "by_payer.csv"),
-        ("By Participant", "by_participant.csv"),
-        ("Balances", "balances.csv"),
-        ("Settlements", "settlements.csv"),
-        ("Warnings", "warnings.csv"),
+        (label_for_report_sheet("Summary"), "summary.csv"),
+        (label_for_report_sheet("Purchases"), "purchases.csv"),
+        (label_for_report_sheet("By Category"), "by_category.csv"),
+        (label_for_report_sheet("By Payer"), "by_payer.csv"),
+        (label_for_report_sheet("By Participant"), "by_participant.csv"),
+        (label_for_report_sheet("Balances"), "balances.csv"),
+        (label_for_report_sheet("Settlements"), "settlements.csv"),
+        (label_for_report_sheet("Warnings"), "warnings.csv"),
     )
     for sheet_name, filename in sheets:
         worksheet = workbook.create_sheet(sheet_name)
         _write_sheet(worksheet, sheet_name, _read_csv(tables_dir / filename))
-    charts_sheet = workbook.create_sheet("Charts")
+    charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
     _write_charts_sheet(charts_sheet, charts_dir)
     workbook.active = 0
     workbook.calculation.fullCalcOnLoad = True
@@ -698,14 +712,14 @@ def _warnings(
 def _summary_rows(dataset: SettlementPeriodReportDataset) -> list[list[object]]:
     summary = dataset.summary
     return [
-        ["Settlement period ID", summary["settlement_period_id"]],
+        [label_for_report_field("Settlement period ID"), summary["settlement_period_id"]],
         ["Название", summary["name"]],
-        ["Статус", summary["status"]],
+        ["Статус", label_for_period_status(str(summary["status"]))],
         ["Дата начала", summary["date_from"]],
         ["Дата окончания", summary["date_to"]],
-        ["Closed at", summary["closed_at"]],
-        ["Reopened at", summary["reopened_at"]],
-        ["Snapshot", summary["generated_at"]],
+        [label_for_report_field("Closed at"), summary["closed_at"]],
+        [label_for_report_field("Reopened at"), summary["reopened_at"]],
+        [label_for_report_field("Snapshot"), summary["generated_at"]],
         ["Общая сумма периода", summary["total_amount"]],
         ["Количество покупок", summary["purchase_count"]],
         ["Средний чек", summary["average_purchase"]],
@@ -732,7 +746,7 @@ def _purchase_rows(dataset: SettlementPeriodReportDataset) -> Iterable[list[obje
             purchase.amount,
             purchase.payer,
             purchase.participants,
-            "settled" if purchase.settled else "open",
+            label_for_purchase_status("settled" if purchase.settled else "open"),
             purchase.comment,
             row.payer_total,
             row.payer_rank,

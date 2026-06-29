@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 from expense_splitter.models import Balance, Purchase, Settlement
+from expense_splitter.ui_labels import label_for_purchase_status
 
 
 def generate_markdown_report(
@@ -16,12 +17,12 @@ def generate_markdown_report(
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     report_lines = [
-        "# Expense Splitter Report",
-        f"**Generated:** {now}",
+        "# Отчет Expense Splitter",
+        f"**Дата формирования отчета:** {now}",
         "",
-        "## 1. Summary of Balances",
+        "## 1. Сводка балансов",
         "",
-        "| Participant | Paid | Share | Net Balance |",
+        "| Участник | Оплатил | Доля | Баланс |",
         "|---|---|---|---|"
     ]
 
@@ -32,15 +33,15 @@ def generate_markdown_report(
 
     report_lines.extend([
         "",
-        "## 2. Required Settlements",
+        "## 2. Итоговые переводы",
         ""
     ])
 
     if not settlements:
-        report_lines.append("All balances are settled. No transfers required.")
+        report_lines.append("Все балансы закрыты. Переводы не требуются.")
     else:
         report_lines.extend([
-            "| From | To | Amount |",
+            "| От | Кому | Сумма |",
             "|---|---|---|"
         ])
         for s in settlements:
@@ -50,22 +51,22 @@ def generate_markdown_report(
 
     report_lines.extend([
         "",
-        "## 3. List of Purchases",
+        "## 3. Список покупок",
         ""
     ])
 
     if not purchases:
-        report_lines.append("No purchases recorded.")
+        report_lines.append("Покупок нет.")
     else:
         report_lines.extend([
-            "| Date | Purchase Name | Payer | Amount | Participants | Category | Settlement |",
+            "| Дата | Покупка | Плательщик | Сумма | Участники | Категория | Статус |",
             "|---|---|---|---|---|---|---|"
         ])
         for p in sorted(purchases, key=lambda x: x.date or datetime.min.date()):
-            date_str = p.date.isoformat() if p.date else "N/A"
+            date_str = p.date.isoformat() if p.date else "Не указана"
             participants_str = ", ".join(p.participants)
-            cat_str = p.category or "N/A"
-            settlement_str = p.settlement_period_id if p.settled else "open"
+            cat_str = p.category or "Без категории"
+            settlement_str = label_for_purchase_status("settled" if p.settled else "open")
             report_lines.append(
                 f"| {date_str} | {p.purchase_name} | {p.payer} | {p.amount:.2f} | "
                 f"{participants_str} | {cat_str} | {settlement_str} |"

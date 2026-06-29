@@ -38,6 +38,12 @@ from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.settlement import calculate_settlements
 from expense_splitter.settlement_periods import filter_purchases_by_settlement_scope
+from expense_splitter.ui_labels import (
+    label_for_purchase_status,
+    label_for_report_field,
+    label_for_report_sheet,
+    label_for_scope,
+)
 from expense_splitter.visual.palette import (
     PALETTE_NAME,
     PALETTE_VERSION,
@@ -340,8 +346,11 @@ def write_current_markdown(
     lines = [
         "# Отчет по текущим взаиморасчетам",
         "",
-        f"Scope: {dataset.scope}",
-        f"Snapshot: {dataset.generated_at.isoformat(timespec='seconds')}",
+        f"{label_for_report_field('Scope')}: {label_for_scope(dataset.scope)}",
+        (
+            f"{label_for_report_field('Snapshot')}: "
+            f"{dataset.generated_at.isoformat(timespec='seconds')}"
+        ),
         "",
         "## Сводка",
         "",
@@ -414,7 +423,7 @@ def write_current_markdown(
     )
     _append_markdown_table(
         lines,
-        "Warnings",
+        "Предупреждения",
         ["Тип", "ID покупки", "Покупка", "Сообщение"],
         _warning_rows(warnings),
     )
@@ -465,16 +474,20 @@ def write_current_html(
         if not dataset.purchases and dataset.scope == "open"
         else ""
     )
+    scope_label = escape(label_for_report_field("Scope"))
+    scope_value = escape(label_for_scope(dataset.scope))
+    snapshot_label = escape(label_for_report_field("Snapshot"))
+    snapshot_value = escape(dataset.generated_at.isoformat(timespec="seconds"))
     document = f"""<!doctype html>
 <html lang="ru"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Отчет по текущим взаиморасчетам</title>
 <style>{CURRENT_HTML_CSS}</style></head><body><main>
 <header><h1>Отчет по текущим взаиморасчетам</h1>
-<p class="meta">Scope: {escape(dataset.scope)}<br>
-Snapshot: {escape(dataset.generated_at.isoformat(timespec='seconds'))}</p></header>
+<p class="meta">{scope_label}: {scope_value}<br>
+{snapshot_label}: {snapshot_value}</p></header>
 <section><h2>Сводка</h2>{empty_note}<div class="cards">{card_html}</div></section>
-<section><h2>Warnings</h2><div class="panel warning">{warnings_html}</div></section>
+<section><h2>Предупреждения</h2><div class="panel warning">{warnings_html}</div></section>
 <section><h2>Графики</h2>{chart_html}</section>
 <section><h2>Таблицы</h2>{table_html}</section>
 <section><h2>Файлы</h2><div class="panel links">
@@ -494,19 +507,19 @@ def write_current_xlsx(
     workbook = Workbook()
     workbook.remove(workbook.active)
     sheets = (
-        ("Summary", "summary.csv"),
-        ("Purchases", "purchases.csv"),
-        ("By Category", "by_category.csv"),
-        ("By Payer", "by_payer.csv"),
-        ("By Participant", "by_participant.csv"),
-        ("Balances", "balances.csv"),
-        ("Settlements", "settlements.csv"),
-        ("Warnings", "warnings.csv"),
+        (label_for_report_sheet("Summary"), "summary.csv"),
+        (label_for_report_sheet("Purchases"), "purchases.csv"),
+        (label_for_report_sheet("By Category"), "by_category.csv"),
+        (label_for_report_sheet("By Payer"), "by_payer.csv"),
+        (label_for_report_sheet("By Participant"), "by_participant.csv"),
+        (label_for_report_sheet("Balances"), "balances.csv"),
+        (label_for_report_sheet("Settlements"), "settlements.csv"),
+        (label_for_report_sheet("Warnings"), "warnings.csv"),
     )
     for sheet_name, filename in sheets:
         worksheet = workbook.create_sheet(sheet_name)
         _write_sheet(worksheet, sheet_name, _read_csv(tables_dir / filename))
-    charts_sheet = workbook.create_sheet("Charts")
+    charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
     _write_charts_sheet(charts_sheet, charts_dir)
     workbook.active = 0
     workbook.calculation.fullCalcOnLoad = True
@@ -673,8 +686,8 @@ def _purchase_warning(warning_type: str, purchase: Purchase, message: str) -> di
 def _summary_rows(dataset: CurrentReportDataset) -> list[list[object]]:
     summary = dataset.summary
     return [
-        ["Scope", summary["scope"]],
-        ["Snapshot", summary["generated_at"]],
+        [label_for_report_field("Scope"), label_for_scope(str(summary["scope"]))],
+        [label_for_report_field("Snapshot"), summary["generated_at"]],
         ["Общая сумма", summary["total_amount"]],
         ["Количество покупок", summary["purchase_count"]],
         ["Средний чек", summary["average_purchase"]],
@@ -694,7 +707,7 @@ def _purchase_rows(dataset: CurrentReportDataset) -> Iterable[list[object]]:
             purchase.amount,
             purchase.payer,
             purchase.participants,
-            "settled" if purchase.settled else "open",
+            label_for_purchase_status("settled" if purchase.settled else "open"),
             purchase.comment,
             row.payer_total,
             row.payer_rank,
@@ -934,7 +947,7 @@ def _chart_warning(filename: str) -> dict[str, object]:
         "warning_type": "chart_no_data",
         "purchase_id": "",
         "purchase_name": "",
-        "message": f"График {filename} не создан: нет данных для текущего scope.",
+        "message": f"График {filename} не создан: нет данных для текущего режима расчета.",
     }
 
 
