@@ -26,6 +26,7 @@ class ExpenseSplitterGui:
         self.root.geometry("1100x720")
         self.status_var = tk.StringVar(value="Готово")
         self.last_current_report_dir: Path | None = None
+        self.last_period_report_dirs: dict[str, Path] = {}
         self._build()
         self.refresh_all()
 
@@ -179,6 +180,26 @@ class ExpenseSplitterGui:
         ttk.Button(toolbar, text="Переоткрыть период", command=self.reopen_period).pack(
             side="left", padx=6
         )
+        ttk.Button(
+            toolbar,
+            text="Создать отчет периода",
+            command=self.generate_period_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
+            text="Открыть HTML отчета периода",
+            command=self.open_period_html_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
+            text="Открыть XLSX отчета периода",
+            command=self.open_period_xlsx_report,
+        ).pack(side="left", padx=6)
+        ttk.Button(
+            toolbar,
+            text="Открыть папку отчета периода",
+            command=self.open_period_report_folder,
+        ).pack(side="left", padx=6)
         self.periods_tree = make_tree(
             tab,
             ("ID", "Название", "Статус", "С", "По", "Покупок", "Сумма"),
@@ -818,6 +839,64 @@ class ExpenseSplitterGui:
             messagebox.showwarning("Периоды", "Выберите период в таблице.", parent=self.root)
             return None
         return actions.settlement_period(self.state, selected[0])
+
+    def _require_period_report_dir(self) -> tuple[object, Path] | tuple[None, None]:
+        period = self._selected_period()
+        if not period:
+            return None, None
+        report_dir = self.last_period_report_dirs.get(period.id)
+        if report_dir is None:
+            messagebox.showerror(
+                "Отчет не создан",
+                "Сначала создайте отчет периода.",
+                parent=self.root,
+            )
+            return None, None
+        return period, report_dir
+
+    def generate_period_report(self) -> None:
+        period = self._selected_period()
+        if not period:
+            return
+        if period.status == "reopened":
+            messagebox.showwarning(
+                "Период переоткрыт",
+                "Период был переоткрыт. Отчет показывает сохраненный snapshot периода.",
+                parent=self.root,
+            )
+        report_dir = self.run_safely(
+            lambda: actions.generate_settlement_period_snapshot_report(self.state, period.id),
+            None,
+        )
+        if report_dir:
+            self.last_period_report_dirs[period.id] = report_dir
+            message = f"Отчет периода создан: {report_dir}"
+            self.status_var.set(message)
+            messagebox.showinfo("Отчет создан", f"Папка отчета:\n{report_dir}", parent=self.root)
+
+    def open_period_html_report(self) -> None:
+        period, report_dir = self._require_period_report_dir()
+        if period is None or report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_settlement_period_report(report_dir, "html"),
+            "HTML-отчет периода открыт",
+        )
+
+    def open_period_xlsx_report(self) -> None:
+        period, report_dir = self._require_period_report_dir()
+        if period is None or report_dir is None:
+            return
+        self.run_safely(
+            lambda: actions.open_settlement_period_report(report_dir, "xlsx"),
+            "XLSX-отчет периода открыт",
+        )
+
+    def open_period_report_folder(self) -> None:
+        period, report_dir = self._require_period_report_dir()
+        if period is None or report_dir is None:
+            return
+        self.open_path(report_dir)
 
     def _show_period(self, period) -> None:
         transfers = (

@@ -15,6 +15,11 @@ from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS, EXAM
 from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
 from expense_splitter.reporting import generate_markdown_report
 from expense_splitter.settlement import calculate_settlements
+from expense_splitter.settlement_period_report import (
+    SettlementPeriodReportError,
+    build_settlement_period_report_dataset,
+    generate_settlement_period_report,
+)
 from expense_splitter.settlement_periods import (
     close_settlement_period,
     filter_purchases_by_settlement_scope,
@@ -406,6 +411,43 @@ def settlement_period_reopen(
         raise typer.Exit(2) from error
 
     console.print(f"[green]Reopened settlement period {period.id}.[/green]")
+
+
+@settlement_period_app.command("report")
+def settlement_period_report_command(
+    settlement_period_id: str = typer.Argument(..., help="Settlement period id"),
+    output_format: str = typer.Option(
+        "all", "--format", help="Output: markdown, csv, png, html, xlsx, all"
+    ),
+    output_root: Path = typer.Option(
+        Path("reports/settlement_periods"),
+        "--output-root",
+        help="Settlement period reports root",
+    ),
+    data_dir: Path = typer.Option(DATA_DIR, help="Data directory"),
+):
+    """Generate historical report for one settlement period snapshot."""
+    try:
+        periods = load_settlement_periods(data_dir / SETTLEMENT_PERIODS_FILE)
+        purchases = load_purchases(data_dir / "purchases.yaml")
+        participants = load_participants(data_dir / "participants.yaml") or DEFAULT_PARTICIPANTS
+        dataset = build_settlement_period_report_dataset(
+            periods,
+            purchases,
+            participants,
+            settlement_period_id,
+        )
+        report_dir = generate_settlement_period_report(dataset, output_root, output_format)
+    except StorageError as error:
+        handle_storage_error(error)
+    except SettlementPeriodReportError as error:
+        typer.echo(str(error))
+        raise typer.Exit(2) from error
+    except ValueError as error:
+        typer.echo(f"Settlement period report error: {error}")
+        raise typer.Exit(2) from error
+
+    console.print(f"[green]Settlement period report generated at {report_dir}[/green]")
 
 
 @app.command()

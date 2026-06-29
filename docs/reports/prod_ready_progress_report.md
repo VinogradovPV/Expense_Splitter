@@ -1,3 +1,40 @@
+## P2.RPT.2 — Settlement period report
+
+Дата: 2026-06-29
+Статус: реализовано локально; automated quality gate пройден, кроме `compileall` и отдельного
+PowerShell CLI smoke, где approval review дважды не завершился до deadline.
+
+### Реализовано
+
+- CLI-команда `expense-splitter settlement-period report <id> --format all`.
+- Исторический отчет по snapshot периода в `reports/settlement_periods/<id>_<timestamp>/`.
+- Форматы Markdown, CSV, PNG, offline HTML, XLSX и `metadata.json`.
+- Таблицы summary, purchases, by_category, by_payer, by_participant, balances, settlements,
+  warnings.
+- Графики spending_by_category, spending_by_payer, participant_share, balances, top_purchases.
+- Snapshot settlements используются как источник истины; balances восстанавливаются по покупкам
+  периода с `balance_source = "recomputed_from_period_purchases"`.
+- Missing purchase id и reopened period не ломают генерацию и попадают в warnings.
+- GUI-кнопки на вкладке `Периоды взаиморасчетов`: создать отчет периода, открыть HTML, открыть XLSX,
+  открыть папку отчета.
+- Документация обновлена в README, USER_GUIDE, ANALYTICS, SETTLEMENT_PERIODS и Troubleshooting.
+
+### Проверки
+
+- `python -m pip install -e ".[dev]"` — OK; сохраняется прежнее warning: Typer 0.26.7 не объявляет
+  extra `all`.
+- `pytest tests\test_settlement_period_report.py -v` — `9 passed`.
+- `pytest tests\test_gui_settlement_period_report.py -v` — `2 passed`.
+- `pytest tests -v` — `131 passed`.
+- `scripts\qa\check_text_encoding.py` — OK.
+- `ruff check src tests` — OK.
+- `git diff --check` — OK; только предупреждения Git о будущей CRLF-нормализации.
+- `expense-splitter-gui.exe --help` — OK.
+- `scripts\run-gui.ps1 -Help` — OK.
+- `compileall -q src tests` — approval review timeout twice; код покрыт полным pytest и ruff.
+- Отдельный PowerShell CLI smoke в isolated `.tmp` — approval review timeout twice; CLI path покрыт
+  `tests/test_settlement_period_report.py::test_cli_settlement_period_report_generates_requested_outputs`.
+
 ## P2.GUI.5 — Directory management for participants and categories
 
 Дата: 2026-06-25

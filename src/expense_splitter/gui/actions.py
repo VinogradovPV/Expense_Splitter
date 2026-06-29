@@ -48,6 +48,10 @@ from expense_splitter.directories import (
 from expense_splitter.gui.state import GuiState
 from expense_splitter.models import Purchase
 from expense_splitter.settlement import calculate_settlements
+from expense_splitter.settlement_period_report import (
+    build_settlement_period_report_dataset,
+    generate_settlement_period_report,
+)
 from expense_splitter.settlement_periods import (
     close_settlement_period,
     filter_purchases_by_settlement_scope,
@@ -415,6 +419,26 @@ def generate_current_state_report(state: GuiState, output_format: str = "all") -
     return generate_current_report(dataset, state.current_state_dir, output_format)
 
 
+def generate_settlement_period_snapshot_report(
+    state: GuiState,
+    settlement_period_id: str,
+    output_format: str = "all",
+) -> Path:
+    ensure_data(state)
+    participants = load_participants(state.data_dir / "participants.yaml") or DEFAULT_PARTICIPANTS
+    dataset = build_settlement_period_report_dataset(
+        settlement_periods(state),
+        list_purchases(state),
+        participants,
+        settlement_period_id,
+    )
+    return generate_settlement_period_report(
+        dataset,
+        state.reports_dir / "settlement_periods",
+        output_format,
+    )
+
+
 def open_folder(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     if platform.system() == "Windows":
@@ -485,6 +509,23 @@ def current_report_path(report_dir: Path, report_type: str) -> Path:
     return path
 
 
+def settlement_period_report_path(report_dir: Path, report_type: str) -> Path:
+    names = {
+        "html": "settlement_period_dashboard.html",
+        "markdown": "settlement_period_report.md",
+        "xlsx": "settlement_period.xlsx",
+    }
+    if report_type not in names:
+        raise ValueError("Неизвестный тип отчета.")
+    path = report_dir / names[report_type]
+    if not path.is_file():
+        label = report_type.upper() if report_type != "markdown" else "Markdown"
+        raise FileNotFoundError(
+            f"{label}-отчет периода не создан. Сначала создайте отчет периода."
+        )
+    return path
+
+
 def open_report(report_dir: Path, report_type: str) -> None:
     path = report_path(report_dir, report_type)
     if platform.system() == "Windows":
@@ -497,6 +538,16 @@ def open_report(report_dir: Path, report_type: str) -> None:
 
 def open_current_report(report_dir: Path, report_type: str) -> None:
     path = current_report_path(report_dir, report_type)
+    if platform.system() == "Windows":
+        os.startfile(path)  # type: ignore[attr-defined]
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
+def open_settlement_period_report(report_dir: Path, report_type: str) -> None:
+    path = settlement_period_report_path(report_dir, report_type)
     if platform.system() == "Windows":
         os.startfile(path)  # type: ignore[attr-defined]
     elif platform.system() == "Darwin":

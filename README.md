@@ -17,6 +17,7 @@ Expense Splitter — локальное приложение для учёта �
 - расчёты в scope `open` или по всей истории `all`;
 - закрытие и переоткрытие периодов без удаления истории;
 - аналитика в Markdown, CSV, PNG, offline HTML и XLSX;
+- исторический отчет по конкретному settlement period snapshot;
 - безопасные backups и reset-test с typed confirmation;
 - Windows standalone executables через PyInstaller.
 
@@ -64,7 +65,9 @@ GUI содержит вкладки `Покупки`, `Текущие расчё
    незакрытым покупкам.
 6. На вкладке периодов выполните preview и нажмите `Закрыть период и обнулить текущие
    взаиморасчёты`. Покупки останутся в истории.
-7. В разделе аналитики выберите месяц, квартал или год, формат `all`, затем откройте HTML/XLSX или
+7. Для исторического snapshot выберите период и нажмите `Создать отчет периода`, затем откройте
+   HTML, XLSX или папку отчета.
+8. В разделе аналитики выберите месяц, квартал или год, формат `all`, затем откройте HTML/XLSX или
    папку отчёта.
 
 ## Данные и безопасность
@@ -124,6 +127,23 @@ expense-splitter current-report --scope all --format html
 `current_state_report.md`, `current_state_dashboard.html`, `current_state.xlsx`,
 `metadata.json`, CSV-таблицы в `tables/` и PNG-графики в `charts/`. Закрытие периода выполняется
 отдельной кнопкой или командой `settlement-period close`.
+
+## Отчет по settlement period
+
+Отчет по settlement period отличается от analytics и current-report: это исторический snapshot
+конкретного закрытого или переоткрытого периода. Источником истины служит запись в
+`settlement_periods.yaml`: `purchase_ids`, `total_amount`, `settlements`, даты и статус. Детали
+покупок догружаются из текущего `purchases.yaml` по snapshot id; если запись покупки отсутствует,
+отчет не падает и пишет warning. Команда не меняет YAML-данные.
+
+```powershell
+expense-splitter settlement-period report settlement_2026_06_30_001 --format all
+```
+
+Результаты сохраняются в
+`reports/settlement_periods/<settlement_period_id>_<YYYY-MM-DD_HH-MM-SS>/`: Markdown, offline HTML,
+XLSX, `metadata.json`, CSV-таблицы в `tables/` и PNG-графики в `charts/`. Warning для `reopened`
+означает, что период уже возвращали в open scope, а отчет показывает сохраненный snapshot периода.
 
 Форматы:
 

@@ -16,6 +16,7 @@ expense-splitter settlement-period close --from 2026-06-01 --to 2026-06-30 --nam
 expense-splitter settlement-period list
 expense-splitter settlement-period show settlement_2026_06_30_001
 expense-splitter settlement-period reopen settlement_2026_06_30_001 --confirm REOPEN_PERIOD
+expense-splitter settlement-period report settlement_2026_06_30_001 --format all
 ```
 
 ## Reopen
@@ -39,6 +40,29 @@ expense-splitter settle --settlement-period settlement_2026_06_30_001
 только строит отчет о текущем состоянии взаиморасчетов. Команда не закрывает период, не меняет
 `settled` и не записывает `settlement_period_id`. Для фиксации периода используйте
 `settlement-period close`.
+
+## Отчет периода
+
+`settlement-period report <id>` создает исторический отчет по snapshot периода. Это не analytics за
+месяц/квартал/год и не current-report `open/all`: отчет отвечает, какие покупки входили в закрытый
+период, сколько было потрачено, как расходы распределились по категориям, плательщикам и
+участникам, какие балансы восстановлены по покупкам периода и какие итоговые переводы были
+сохранены в snapshot. Snapshot settlements не пересчитываются.
+
+Если id не найден, команда завершится с ошибкой без traceback:
+
+```text
+Период взаиморасчетов не найден: <id>
+```
+
+Файлы создаются в `reports/settlement_periods/<id>_<YYYY-MM-DD_HH-MM-SS>/`:
+`settlement_period_report.md`, `settlement_period_dashboard.html`, `settlement_period.xlsx`,
+`metadata.json`, таблицы `tables/*.csv` и графики `charts/*.png`. Если период был `reopened`, в
+warnings будет пояснение, что отчет показывает сохраненный snapshot периода.
+
+В GUI выберите строку на вкладке `Периоды взаиморасчетов`, нажмите `Создать отчет периода`, затем
+используйте `Открыть HTML отчета периода`, `Открыть XLSX отчета периода` или
+`Открыть папку отчета периода`.
 
 ## Close и reset-test
 

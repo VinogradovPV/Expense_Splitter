@@ -40,6 +40,17 @@ expense-splitter current-report --scope open --format all
 
 HTML находится в `reports/current_state/open_<timestamp>/current_state_dashboard.html`.
 
+Для отчета конкретного settlement period сначала выберите период в GUI и нажмите
+`Создать отчет периода` либо выполните:
+
+```powershell
+expense-splitter settlement-period report settlement_2026_06_30_001 --format all
+```
+
+Если команда пишет `Период взаиморасчетов не найден: <id>`, проверьте id через
+`expense-splitter settlement-period list`. Warning про `reopened` не является ошибкой: он означает,
+что период позже переоткрывали, а отчет показывает сохраненный snapshot.
+
 ## XLSX не создаётся или восстанавливается Excel
 
 Закройте XLSX перед повторной генерацией: открытый Excel блокирует замену файла. Новая версия

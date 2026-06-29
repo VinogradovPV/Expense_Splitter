@@ -49,6 +49,26 @@ reports/current_state/open_<YYYY-MM-DD_HH-MM-SS>/
     └── top_purchases.png
 ```
 
+## Исторический отчет settlement period
+
+`expense-splitter settlement-period report <id>` строит отчет по конкретному snapshot периода, а не
+по календарному month/quarter/year и не по текущему `open/all` scope. Snapshot settlements и
+`total_amount` берутся из `settlement_periods.yaml`; детали покупок восстанавливаются из текущего
+`purchases.yaml` по `purchase_ids`. Если покупка уже отсутствует, отчет добавляет warning и
+продолжает генерацию.
+
+```powershell
+expense-splitter settlement-period report settlement_2026_06_30_001 --format all
+expense-splitter settlement-period report settlement_2026_06_30_001 --format html
+expense-splitter settlement-period report settlement_2026_06_30_001 --format xlsx
+```
+
+Команда ничего не меняет в данных. Результаты лежат в
+`reports/settlement_periods/<id>_<YYYY-MM-DD_HH-MM-SS>/` и включают
+`settlement_period_report.md`, `settlement_period_dashboard.html`, `settlement_period.xlsx`,
+`metadata.json`, CSV в `tables/` и PNG в `charts/`. Warning `period_reopened` означает, что период
+позже переоткрывали, но отчет показывает сохраненный исторический snapshot.
+
 ## Форматы
 
 - `markdown` — читабельный `analytics_report.md`;
