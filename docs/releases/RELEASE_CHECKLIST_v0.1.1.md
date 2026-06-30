@@ -1,15 +1,16 @@
 # Expense Splitter v0.1.1 Release Checklist
 
 Дата подготовки: 2026-06-30
-Статус: dry-run checklist, release не опубликован.
+Статус: release hygiene checklist после RC-проверки.
 
 ## Version
 
 - [x] Проверить `pyproject.toml`.
 - [x] Зафиксированная версия: `0.1.1`.
 - [x] Рекомендуемый tag: `v0.1.1`.
-- [ ] Если нужен release candidate: использовать `v0.1.1-rc.1`.
-- [ ] Не создавать `v0.1.0` для текущего HEAD: версия пакета уже `0.1.1`.
+- [x] RC tag `v0.1.1-rc.1` уже использован для tag-triggered workflow dry-run.
+- [x] Не создавать `v0.1.0` для текущего HEAD: версия пакета уже `0.1.1`.
+- [ ] Принять отдельное решение по существующему `v0.1.1`, который указывает на старый commit `c6b4c8d`.
 
 ## Repository baseline
 
@@ -17,6 +18,7 @@
 - [x] HEAD совпадает с `origin/prod-ready/p0-p1` перед dry-run подготовкой.
 - [x] Локальные `data/*.yaml` не tracked и ignored.
 - [x] Generated artifacts не staged.
+- [x] TG-PREP.0 baseline: HEAD `7e15112` совпадает с `origin/prod-ready/p0-p1`.
 - [ ] Перед tag повторить `git status --short`.
 - [ ] Перед tag повторить `git rev-parse HEAD` и `git rev-parse origin/prod-ready/p0-p1`.
 
@@ -61,13 +63,21 @@
 
 ## Do not do without explicit confirmation
 
-- [ ] Не создавать local tag.
-- [ ] Не создавать remote tag.
+- [x] Не создавать новые local tags в TG-PREP.1.
+- [x] Не создавать новые remote tags в TG-PREP.1.
 - [ ] Не выполнять `git push origin v0.1.1`.
 - [ ] Не публиковать GitHub Release.
 - [ ] Не загружать artifacts вручную.
 
+## Release-history mismatch
+
+- [x] Remote tag `v0.1.1` существует.
+- [x] GitHub Release `v0.1.1` существует: `https://github.com/VinogradovPV/Expense_Splitter/releases/tag/v0.1.1`.
+- [x] Tag `v0.1.1` указывает на старый commit `c6b4c8d`, а текущий baseline — `7e15112`.
+- [ ] Не удалять и не пересоздавать `v0.1.1` без отдельного решения пользователя.
+
 ## Next
 
 - [x] P3.REL.2 — RC tag workflow dry-run.
-- [ ] P3.REL.3 — Final v0.1.1 release после явного подтверждения пользователя.
+- [ ] Решить release-history mismatch перед финальной release-процедурой.
+- [ ] TG-PREP.2 — создать `cloud/telegram-prep` после release hygiene decision.

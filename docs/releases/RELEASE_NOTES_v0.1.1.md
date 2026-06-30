@@ -1,7 +1,8 @@
 # Expense Splitter v0.1.1 Release Notes
 
 Дата подготовки: 2026-06-30
-Статус: dry-run, tag не создан.
+Статус: release hygiene после RC-проверки; документ описывает текущий baseline и известные
+release-history расхождения.
 
 ## Кратко
 
@@ -10,11 +11,12 @@ Expense Splitter — локальное приложение для учета �
 хранит данные локально в YAML и генерирует пользовательские отчеты без обращения к внешним
 сервисам.
 
-Рекомендуемый release tag для текущего состояния: `v0.1.1`.
+Рекомендуемый release tag для текущего состояния: `v0.1.1`, но tag/release с таким именем уже
+существует в GitHub и указывает на более старый commit `c6b4c8d`, а не на текущий baseline
+`7e15112`.
 
 `pyproject.toml` содержит версию `0.1.1`, поэтому tag `v0.1.0` не рекомендуется для этого
-коммита. Если нужен release candidate перед финальным релизом, безопасный вариант:
-`v0.1.1-rc.1`.
+коммита. RC tag `v0.1.1-rc.1` уже использовался для проверки tag-triggered workflow.
 
 ## Основные возможности GUI
 
@@ -78,17 +80,24 @@ Release workflow должен собирать artifacts заново в GitHub 
 
 ## Known limitations
 
-- Release tag workflow еще не проверен реальным RC tag в рамках P3.REL.2.
+- RC tag workflow проверен на `v0.1.1-rc.1`, но существующий GitHub Release для RC был создан как
+  обычный release (`prerelease=false`). Workflow исправлен для будущих RC tags; существующий RC
+  release не изменялся без отдельного подтверждения.
+- GitHub tag/release `v0.1.1` уже существует и указывает на старый commit `c6b4c8d`, не на текущий
+  baseline `7e15112`. Не удалять и не пересоздавать его без отдельного решения пользователя.
 - Финальный release tag и GitHub Release требуют отдельного явного подтверждения пользователя.
 - PDF требует локальный кириллический шрифт в среде сборки или запуска.
 - Данные хранятся локально в YAML; многопользовательская синхронизация не реализована.
-- Для Windows standalone требуется отдельный smoke test скачанного release artifact.
+- Для Windows standalone требуется отдельный smoke test полностью скачанного release artifact.
 
 ## Dry-run decision
 
-Tag не создан. GitHub Release не опубликован. Artifacts вручную не загружались.
+В рамках P3.REL.1 tag не создавался, GitHub Release не публиковался и artifacts вручную не
+загружались. Позже в рамках P3.REL.2 был создан `v0.1.1-rc.1`, а существующий `v0.1.1` был
+обнаружен как release-history mismatch.
 
-Следующий рекомендуемый шаг: `P3.REL.2 — RC tag workflow dry-run`.
+Следующий рекомендуемый шаг перед cloud-веткой: `TG-PREP.2 — создать cloud-prep ветку`, только
+после явного решения по release-history mismatch.
 
 ## P3.REL.2 RC verification note
 
