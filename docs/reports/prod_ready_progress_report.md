@@ -1249,3 +1249,44 @@ Tag-triggered Build Release is verified. Before final release, use the workflow 
 `175e435250a5b4d7637cd41dc4eb406e2fb9fb66`; if another RC is created, verify that GitHub marks it
 as prerelease. Clean-machine artifact smoke remains recommended when network conditions allow full
 downloads, but the connection issue is not blocking release workflow validation.
+
+## TG-PREP.0 — Сверка baseline перед cloud-веткой
+
+Дата: 2026-06-30
+Статус: partial; baseline синхронизирован с `origin/prod-ready/p0-p1`, но перед cloud-веткой есть
+зафиксированные несоответствия, которые не исправлялись автоматически.
+
+### Baseline
+
+- Branch: `prod-ready/p0-p1`
+- HEAD: `7c54738c5ab86fba147703a391bd84852b0154bc`
+- `origin/prod-ready/p0-p1`: `7c54738c5ab86fba147703a391bd84852b0154bc`
+- `git fetch origin --prune`: OK.
+- `git pull --ff-only origin prod-ready/p0-p1`: OK, already up to date.
+- Latest CI: `28447344447`, `completed success`, commit `docs: record RC artifact download decision`.
+
+### Что подтверждено
+
+- Локальный HEAD совпадает с `origin/prod-ready/p0-p1`.
+- Последние P2/P3 commits опубликованы в истории ветки.
+- `data/*.yaml` не tracked.
+- Generated artifacts (`reports/`, `.tmp/`, `build/`, `dist/`, caches, `*.bak`) ignored и не staged.
+- RC workflow `Build Release` для `v0.1.1-rc.1` завершился успешно; локальная проблема скачивания
+  artifacts ранее классифицирована пользователем как network issue, не release blocker.
+
+### Несоответствия baseline
+
+- В рабочем дереве есть untracked файл инструкции:
+  `docs/prompts/expense_splitter_pre_telegram_bot_step_by_step_v1_ru.md`. Он классифицирован как
+  source/docs input для текущего этапа и не добавлялся в Git автоматически.
+- Локально присутствует tag `v0.1.1` вместе с `v0.1.1-rc.1`. Это противоречит критерию TG-PREP.0
+  "финальный tag v0.1.1 не создан без подтверждения" и требует отдельного решения пользователя
+  перед финальной release-процедурой.
+- `pyproject.toml` все еще содержит `typer[all]>=0.12`; это относится к TG-PREP.1 hygiene и не
+  исправлялось в TG-PREP.0.
+
+### Decision
+
+Не создавать cloud-ветку, Telegram bot, cloud resources, новые tags или releases в рамках TG-PREP.0.
+Следующий безопасный шаг: TG-PREP.1 — синхронизировать release-документы и решить maintenance-хвосты
+перед созданием `cloud/telegram-prep`.
