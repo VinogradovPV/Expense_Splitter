@@ -18,7 +18,7 @@ EXPECTED_SHEETS = [
     "Покупки",
     "По категориям",
     "По плательщикам",
-    "По участникам",
+    "Объем расходов на человека",
     "Балансы участников",
     "Итоговые переводы",
     "Крупнейшие покупки",
@@ -64,6 +64,9 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     purchases = workbook["Покупки"]
     headers = [cell.value for cell in purchases[3]]
     values = [cell.value for cell in purchases[4]]
+    assert "ID" not in headers
+    assert "payer_total" not in headers
+    assert "payer_rank" not in headers
     assert "Наименование покупки" in headers
     assert values[headers.index("Наименование покупки")] == "Обед"
     assert values[headers.index("Категория")] == "Еда"
@@ -74,6 +77,18 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     assert amount_cell.number_format == "#,##0.00"
     assert purchases.freeze_panes == "A4"
     assert purchases.auto_filter.ref
+    charts_sheet = workbook["Графики"]
+    assert any(
+        cell.value == "Объем расходов на человека"
+        for row in charts_sheet.iter_rows()
+        for cell in row
+    )
+    by_payer = workbook["По плательщикам"]
+    payer_headers = [cell.value for cell in by_payer[3]]
+    assert "Доля оплат, %" in payer_headers
+    payer_share_cell = by_payer.cell(4, payer_headers.index("Доля оплат, %") + 1)
+    assert payer_share_cell.value == 100
+    assert payer_share_cell.number_format == "#,##0.00"
     assert len(workbook["Графики"]._images) == 6
     with ZipFile(path) as archive:
         assert not any(name.startswith("xl/tables/") for name in archive.namelist())

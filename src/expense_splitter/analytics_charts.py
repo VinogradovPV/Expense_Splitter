@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from expense_splitter.analytics import AnalyticsDataset
+from expense_splitter.report_tables import chart_display_title
 from expense_splitter.visual.palette import (
     EXPENSE_DIMENSION_COLOR_MAP,
     QUALITATIVE_PALETTE,
@@ -138,7 +139,7 @@ def _participant_share(dataset: AnalyticsDataset, path: Path) -> None:
         labels,
         [float(row["total_share"]) for row in dataset.by_participant],
         [color_map[label] for label in labels],
-        "Доли участников",
+        chart_display_title("participant_share.png"),
         "Доля расходов",
     )
 

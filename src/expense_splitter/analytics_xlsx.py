@@ -10,6 +10,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from expense_splitter.analytics import AnalyticsDataset
+from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
 from expense_splitter.ui_labels import label_for_report_sheet
 
 SHEETS = (
@@ -24,7 +25,7 @@ SHEETS = (
     (label_for_report_sheet("Warnings"), "warnings.csv"),
 )
 
-MONEY_HEADERS = {"Сумма", "Оплачено", "Доля расходов", "Доля", "Баланс"}
+MONEY_HEADERS = {"Сумма", "Оплачено", "Доля расходов", "Доля", "Баланс", "Доля оплат, %"}
 INTEGER_HEADERS = {"Количество покупок", "Покупок", "Место"}
 SUMMARY_MONEY_LABELS = {"Общая сумма", "Средняя покупка"}
 SUMMARY_INTEGER_LABELS = {"Количество покупок", "Количество участников"}
@@ -48,7 +49,7 @@ def write_xlsx_report(
     workbook.remove(workbook.active)
 
     for sheet_name, filename in SHEETS:
-        rows = _read_csv(tables_dir / filename)
+        rows = rows_for_visual_table(filename, _read_csv(tables_dir / filename))
         worksheet = workbook.create_sheet(sheet_name)
         _write_table_sheet(worksheet, sheet_name, rows)
 
@@ -178,6 +179,9 @@ def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
 
     row = 3
     for chart_path in chart_paths:
+        worksheet.cell(row, 1, chart_display_title(chart_path))
+        worksheet.cell(row, 1).font = Font(bold=True, color=PRIMARY)
+        row += 1
         image = Image(chart_path)
         if image.width > 900:
             ratio = 900 / image.width
@@ -195,7 +199,7 @@ def _sheet_title(sheet_name: str) -> str:
         label_for_report_sheet("Purchases"): "Покупки",
         label_for_report_sheet("By Category"): "Расходы по категориям",
         label_for_report_sheet("By Payer"): "Расходы по плательщикам",
-        label_for_report_sheet("By Participant"): "Доли участников",
+        label_for_report_sheet("By Participant"): "Объем расходов на человека",
         label_for_report_sheet("Balances"): "Балансы участников",
         label_for_report_sheet("Settlements"): "Переводы",
         label_for_report_sheet("Top Purchases"): "Крупнейшие покупки",

@@ -106,6 +106,7 @@ def test_report_dataset_uses_period_snapshot_and_purchase_ids():
     assert dataset.balance_source == "recomputed_from_period_purchases"
     assert {row["category"] for row in dataset.by_category} == {"Food", "Transport"}
     assert {row["payer"] for row in dataset.by_payer} == {"Alice", "Bob"}
+    assert sum(row["payer_share_percent"] for row in dataset.by_payer) == Decimal("100.00")
     assert {row["participant"] for row in dataset.by_participant} == {"Alice", "Bob", "Cara"}
 
 
@@ -221,11 +222,24 @@ def test_settlement_period_report_files_are_readable(tmp_path):
     ]
     assert any(row[2] == "Lunch" for row in rows[1:])
 
+    with (report_dir / "tables" / "by_payer.csv").open(
+        encoding="utf-8-sig",
+        newline="",
+    ) as stream:
+        payer_rows = list(csv.reader(stream))
+    assert payer_rows[0] == ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"]
+    assert Decimal(payer_rows[1][3]) + Decimal(payer_rows[2][3]) == Decimal("100.00")
+
     markdown = (report_dir / "settlement_period_report.md").read_text(encoding="utf-8")
     assert "# Отчет по периоду взаиморасчетов" in markdown
+    assert "Доля оплат, %" in markdown
     html = (report_dir / "settlement_period_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="utf-8">' in html
     assert "Отчет по периоду взаиморасчетов" in html
+    assert "Доля оплат, %" in html
+    assert "Объем расходов на человека" in html
+    assert "payer_total" not in html
+    assert "payer_rank" not in html
 
     workbook = load_workbook(report_dir / "settlement_period.xlsx")
     assert workbook.sheetnames == [
@@ -233,12 +247,25 @@ def test_settlement_period_report_files_are_readable(tmp_path):
         "Покупки",
         "По категориям",
         "По плательщикам",
-        "По участникам",
+        "Объем расходов на человека",
         "Балансы участников",
         "Итоговые переводы",
         "Предупреждения",
         "Графики",
     ]
+    purchases_sheet = workbook["Покупки"]
+    purchase_headers = [cell.value for cell in purchases_sheet[3]]
+    assert "ID" not in purchase_headers
+    assert "payer_total" not in purchase_headers
+    assert "payer_rank" not in purchase_headers
+    charts_sheet = workbook["Графики"]
+    assert any(
+        cell.value == "Объем расходов на человека"
+        for row in charts_sheet.iter_rows()
+        for cell in row
+    )
+    payer_sheet = workbook["По плательщикам"]
+    assert "Доля оплат, %" in [cell.value for cell in payer_sheet[3]]
 
 
 def test_empty_period_does_not_fail_and_writes_warning(tmp_path):

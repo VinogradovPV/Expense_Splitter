@@ -69,6 +69,7 @@ def test_dataset_open_scope_excludes_settled_purchases_and_reuses_settlement_log
     assert dataset.summary["total_amount"] == Decimal("150.00")
     assert dataset.summary["purchase_count"] == 2
     assert dataset.summary["average_purchase"] == Decimal("75.00")
+    assert sum(row["payer_share_percent"] for row in dataset.by_payer) == Decimal("100.00")
     expected_balances = calculate_balances(dataset.purchases, ["Alice", "Bob", "Cara"])
     assert dataset.balances == expected_balances
     assert dataset.settlements == calculate_settlements(expected_balances)
@@ -152,25 +153,53 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     ]
     assert any(row[2] == "Lunch" for row in rows[1:])
 
+    with (report_dir / "tables" / "by_payer.csv").open(
+        encoding="utf-8-sig",
+        newline="",
+    ) as stream:
+        payer_rows = list(csv.reader(stream))
+    assert payer_rows[0] == ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"]
+    assert Decimal(payer_rows[1][3]) + Decimal(payer_rows[2][3]) == Decimal("100.00")
+
     markdown = (report_dir / "current_state_report.md").read_text(encoding="utf-8")
     assert "# Отчет по текущим взаиморасчетам" in markdown
     assert "Какие покупки включены: Открытые покупки" in markdown
+    assert "Доля оплат, %" in markdown
+    assert markdown.index("## Итоговые переводы") < markdown.index("## Расходы по категориям")
     html = (report_dir / "current_state_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="UTF-8">' in html
     assert "Отчет по текущим взаиморасчетам" in html
+    assert "Доля оплат, %" in html
+    assert "Объем расходов на человека" in html
+    assert "payer_total" not in html
+    assert "payer_rank" not in html
+    assert html.index("Итоговые переводы") < html.index("Покупки")
 
     workbook = load_workbook(report_dir / "current_state.xlsx")
     assert workbook.sheetnames == [
         "Сводка",
+        "Итоговые переводы",
         "Покупки",
         "По категориям",
         "По плательщикам",
-        "По участникам",
+        "Объем расходов на человека",
         "Балансы участников",
-        "Итоговые переводы",
         "Предупреждения",
         "Графики",
     ]
+    purchases_sheet = workbook["Покупки"]
+    purchase_headers = [cell.value for cell in purchases_sheet[3]]
+    assert "ID" not in purchase_headers
+    assert "payer_total" not in purchase_headers
+    assert "payer_rank" not in purchase_headers
+    charts_sheet = workbook["Графики"]
+    assert any(
+        cell.value == "Объем расходов на человека"
+        for row in charts_sheet.iter_rows()
+        for cell in row
+    )
+    payer_sheet = workbook["По плательщикам"]
+    assert "Доля оплат, %" in [cell.value for cell in payer_sheet[3]]
 
 
 def test_empty_open_scope_writes_metadata_summary_and_warning(tmp_path):

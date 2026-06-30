@@ -137,6 +137,9 @@ expense-splitter current-report --scope all --format html
 `metadata.json`, CSV-таблицы в `tables/` и PNG-графики в `charts/`. Закрытие периода выполняется
 отдельной кнопкой или командой `settlement-period close`.
 
+В таблице `Расходы по плательщикам` во всех форматах выводится `Доля оплат, %`: доля суммы,
+оплаченной конкретным плательщиком, от общей суммы отчета.
+
 ## Отчет по settlement period
 
 Отчет по settlement period отличается от analytics и current-report: это исторический snapshot
@@ -154,6 +157,9 @@ expense-splitter settlement-period report settlement_2026_06_30_001 --format all
 XLSX, `metadata.json`, CSV-таблицы в `tables/` и PNG-графики в `charts/`. Warning для `reopened`
 означает, что период уже возвращали в открытые расчеты, а отчет показывает сохраненный snapshot
 периода.
+
+Таблица `Расходы по плательщикам` также содержит `Доля оплат, %`; значение рассчитывается от
+snapshot `total_amount` периода и не меняет сохраненные переводы.
 
 Форматы:
 

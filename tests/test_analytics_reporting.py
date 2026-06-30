@@ -60,6 +60,7 @@ def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
 def test_csv_is_utf8_sig_with_russian_headers_and_decimal_strings(tmp_path):
     report_dir = generate_analytics_report(sample_dataset(), tmp_path, "csv")
     purchases_path = report_dir / "tables" / "purchases.csv"
+    by_payer_path = report_dir / "tables" / "by_payer.csv"
 
     assert purchases_path.read_bytes().startswith(b"\xef\xbb\xbf")
     with purchases_path.open(encoding="utf-8-sig", newline="") as stream:
@@ -70,6 +71,11 @@ def test_csv_is_utf8_sig_with_russian_headers_and_decimal_strings(tmp_path):
     assert rows[1][3] == "120.50"
     assert rows[1][5] == "Алиса, Боб"
 
+    with by_payer_path.open(encoding="utf-8-sig", newline="") as stream:
+        payer_rows = list(csv.reader(stream))
+    assert payer_rows[0] == ["Плательщик", "Количество покупок", "Оплачено", "Доля оплат, %"]
+    assert payer_rows[1][-1] == "100.00"
+
 
 def test_markdown_only_does_not_create_csv_or_png(tmp_path):
     report_dir = generate_analytics_report(sample_dataset(), tmp_path, "markdown")
@@ -77,6 +83,7 @@ def test_markdown_only_does_not_create_csv_or_png(tmp_path):
     text = (report_dir / "analytics_report.md").read_text(encoding="utf-8")
     assert "# Аналитика расходов: 2026-06" in text
     assert "Обед" in text
+    assert "Доля оплат, %" in text
     assert not (report_dir / "tables").exists()
     assert not (report_dir / "charts").exists()
 

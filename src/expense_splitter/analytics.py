@@ -178,7 +178,10 @@ def aggregate_by_category(purchases: Sequence[Purchase]) -> list[dict[str, objec
     return sorted(totals.values(), key=lambda row: (-row["total_amount"], row["category"]))
 
 
-def aggregate_by_payer(purchases: Sequence[Purchase]) -> list[dict[str, object]]:
+def aggregate_by_payer(
+    purchases: Sequence[Purchase],
+    total_amount: Decimal | None = None,
+) -> list[dict[str, object]]:
     totals: dict[str, dict[str, object]] = {}
     for purchase in purchases:
         row = totals.setdefault(
@@ -187,7 +190,20 @@ def aggregate_by_payer(purchases: Sequence[Purchase]) -> list[dict[str, object]]
         )
         row["purchase_count"] = int(row["purchase_count"]) + 1
         row["total_paid"] = row["total_paid"] + purchase.amount
+    denominator = (
+        total_amount
+        if total_amount is not None
+        else sum((purchase.amount for purchase in purchases), Decimal("0.00"))
+    )
+    for row in totals.values():
+        row["payer_share_percent"] = _percent(row["total_paid"], denominator)
     return sorted(totals.values(), key=lambda row: (-row["total_paid"], row["payer"]))
+
+
+def _percent(amount: Decimal, total: Decimal) -> Decimal:
+    if total == Decimal("0.00"):
+        return Decimal("0.00")
+    return (amount / total * Decimal("100")).quantize(Decimal("0.01"))
 
 
 def aggregate_by_participant(

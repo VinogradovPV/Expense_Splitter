@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
 from typing import Sequence
 
 from expense_splitter.analytics import AnalyticsDataset
+from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
 
 TABLES = (
     ("summary.csv", "Сводка"),
     ("purchases.csv", "Покупки"),
     ("by_category.csv", "Расходы по категориям"),
     ("by_payer.csv", "Расходы по плательщикам"),
-    ("by_participant.csv", "Доли участников"),
+    ("by_participant.csv", "Объем расходов на человека"),
     ("balances.csv", "Балансы"),
     ("settlements.csv", "Переводы"),
     ("top_purchases.csv", "Крупнейшие покупки"),
@@ -23,7 +25,7 @@ TABLES = (
 CHARTS = (
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
-    ("participant_share.png", "Доли расходов участников"),
+    ("participant_share.png", chart_display_title("participant_share.png")),
     ("balances.png", "Итоговые балансы"),
     ("period_trend.png", "Динамика расходов"),
     ("top_purchases.png", "Крупнейшие покупки"),
@@ -45,6 +47,7 @@ h1,h2,h3 { line-height:1.2; } h1 { margin-bottom:6px; } h2 { margin-top:38px; }
 .warning { border-left:5px solid #d99a32; background:#fff9ed; color:var(--warn); }
 table { width:100%; border-collapse:collapse; min-width:620px; }
 th,td { padding:9px 11px; border-bottom:1px solid var(--line); text-align:left; }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
 th { background:#eef3f8; position:sticky; top:0; } td { white-space:normal; }
 .chart { width:100%; height:auto; display:block; margin-top:12px; }
 .missing { padding:18px; border:1px dashed var(--line); color:var(--muted); }
@@ -118,17 +121,30 @@ def _table_section(report_dir: Path, filename: str, title: str) -> str:
             f'<article class="panel"><h3>{escape(title)}</h3><p>Таблица не создана.</p></article>'
         )
     with path.open(encoding="utf-8-sig", newline="") as stream:
-        rows = list(csv.reader(stream))
+        rows = rows_for_visual_table(filename, list(csv.reader(stream)))
     if not rows:
         body = '<p class="muted">Нет данных.</p>'
     else:
         header = "".join(f"<th>{escape(cell)}</th>" for cell in rows[0])
         data = "".join(
-            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>"
+            "<tr>" + "".join(_html_cell(cell) for cell in row) + "</tr>"
             for row in rows[1:]
         )
         body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
     return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
+
+
+def _html_cell(value: str) -> str:
+    css_class = ' class="num"' if _is_numeric_text(value) else ""
+    return f"<td{css_class}>{escape(value)}</td>"
+
+
+def _is_numeric_text(value: str) -> bool:
+    try:
+        Decimal(value)
+    except (InvalidOperation, ValueError):
+        return False
+    return True
 
 
 def _chart_section(report_dir: Path, filename: str, title: str) -> str:

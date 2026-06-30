@@ -4,7 +4,7 @@ import csv
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -36,6 +36,7 @@ from expense_splitter.models import (
 )
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
+from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
 from expense_splitter.settlement import calculate_settlements
 from expense_splitter.settlement_periods import filter_purchases_by_settlement_scope
 from expense_splitter.ui_labels import (
@@ -59,30 +60,29 @@ EMPTY_OPEN_SCOPE_MESSAGE = "Нет открытых покупок для тек
 
 TABLE_SPECS = (
     ("summary.csv", "Сводка"),
+    ("settlements.csv", "Итоговые переводы"),
     ("purchases.csv", "Покупки"),
     ("by_category.csv", "Расходы по категориям"),
     ("by_payer.csv", "Расходы по плательщикам"),
-    ("by_participant.csv", "Доли участников"),
+    ("by_participant.csv", "Объем расходов на человека"),
     ("balances.csv", "Балансы"),
-    ("settlements.csv", "Итоговые переводы"),
     ("warnings.csv", "Предупреждения"),
 )
 
 CHART_SPECS = (
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
-    ("participant_share.png", "Доли участников"),
+    ("participant_share.png", chart_display_title("participant_share.png")),
     ("balances.png", "Балансы"),
     ("top_purchases.png", "Крупнейшие покупки"),
 )
 
 CURRENT_PDF_TABLES = (
-    PdfTableSpec("summary.csv", "Сводка"),
+    PdfTableSpec("settlements.csv", "Итоговые переводы"),
     PdfTableSpec("by_category.csv", "Расходы по категориям"),
     PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Доли участников"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
     PdfTableSpec("balances.csv", "Балансы"),
-    PdfTableSpec("settlements.csv", "Итоговые переводы"),
     PdfTableSpec("purchases.csv", "Покупки"),
     PdfTableSpec("warnings.csv", "Предупреждения"),
 )
@@ -118,6 +118,7 @@ h2 { margin-top:34px; }
 .empty { padding:14px; background:#eef5fb; border:1px solid var(--line); }
 table { width:100%; min-width:640px; border-collapse:collapse; }
 th,td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
 th { background:#eef3f8; }
 .chart { display:block; max-width:100%; height:auto; }
 .missing { color:var(--muted); border:1px dashed var(--line); padding:14px; }
@@ -282,8 +283,16 @@ def write_current_csv_tables(
         ),
         (
             "by_payer.csv",
-            ["Плательщик", "Оплачено", "Покупок"],
-            ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+            ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"],
+            (
+                [
+                    row["payer"],
+                    row["total_paid"],
+                    row["purchase_count"],
+                    row["payer_share_percent"],
+                ]
+                for row in dataset.by_payer
+            ),
         ),
         (
             "by_participant.csv",
@@ -369,6 +378,12 @@ def write_current_markdown(
 
     _append_markdown_table(
         lines,
+        "Итоговые переводы",
+        ["От кого", "Кому", "Сумма"],
+        ([row.from_participant, row.to_participant, row.amount] for row in dataset.settlements),
+    )
+    _append_markdown_table(
+        lines,
         "Расходы по категориям",
         ["Категория", "Сумма", "Покупок", "Доля, %"],
         (
@@ -379,12 +394,15 @@ def write_current_markdown(
     _append_markdown_table(
         lines,
         "Расходы по плательщикам",
-        ["Плательщик", "Оплачено", "Покупок"],
-        ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+        ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"],
+        (
+            [row["payer"], row["total_paid"], row["purchase_count"], row["payer_share_percent"]]
+            for row in dataset.by_payer
+        ),
     )
     _append_markdown_table(
         lines,
-        "Доли участников",
+        "Объем расходов на человека",
         ["Участник", "Доля расходов", "Покупок"],
         (
             [row["participant"], row["total_share"], row["purchase_count"]]
@@ -396,12 +414,6 @@ def write_current_markdown(
         "Балансы",
         ["Участник", "Оплачено", "Доля", "Баланс"],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
-    )
-    _append_markdown_table(
-        lines,
-        "Итоговые переводы",
-        ["От кого", "Кому", "Сумма"],
-        ([row.from_participant, row.to_participant, row.amount] for row in dataset.settlements),
     )
     _append_markdown_table(
         lines,
@@ -433,7 +445,8 @@ def write_current_markdown(
     if chart_paths:
         lines.extend(["## Графики", ""])
         for chart_path in chart_paths:
-            lines.extend([f"![{chart_path.stem}](charts/{chart_path.name})", ""])
+            title = chart_display_title(chart_path)
+            lines.extend([f"![{title}](charts/{chart_path.name})", ""])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -508,17 +521,21 @@ def write_current_xlsx(
     workbook.remove(workbook.active)
     sheets = (
         (label_for_report_sheet("Summary"), "summary.csv"),
+        (label_for_report_sheet("Settlements"), "settlements.csv"),
         (label_for_report_sheet("Purchases"), "purchases.csv"),
         (label_for_report_sheet("By Category"), "by_category.csv"),
         (label_for_report_sheet("By Payer"), "by_payer.csv"),
         (label_for_report_sheet("By Participant"), "by_participant.csv"),
         (label_for_report_sheet("Balances"), "balances.csv"),
-        (label_for_report_sheet("Settlements"), "settlements.csv"),
         (label_for_report_sheet("Warnings"), "warnings.csv"),
     )
     for sheet_name, filename in sheets:
         worksheet = workbook.create_sheet(sheet_name)
-        _write_sheet(worksheet, sheet_name, _read_csv(tables_dir / filename))
+        _write_sheet(
+            worksheet,
+            sheet_name,
+            rows_for_visual_table(filename, _read_csv(tables_dir / filename)),
+        )
     charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
     _write_charts_sheet(charts_sheet, charts_dir)
     workbook.active = 0
@@ -817,17 +834,30 @@ def _html_table(report_dir: Path, filename: str, title: str) -> str:
             f'<article class="panel"><h3>{escape(title)}</h3>'
             '<p class="missing">Таблица не создана.</p></article>'
         )
-    rows = _read_csv(path)
+    rows = rows_for_visual_table(filename, _read_csv(path))
     if not rows:
         body = '<p class="missing">Нет данных.</p>'
     else:
         header = "".join(f"<th>{escape(cell)}</th>" for cell in rows[0])
         data = "".join(
-            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>"
+            "<tr>" + "".join(_html_cell(cell) for cell in row) + "</tr>"
             for row in rows[1:]
         )
         body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
     return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
+
+
+def _html_cell(value: str) -> str:
+    css_class = ' class="num"' if _is_numeric_text(value) else ""
+    return f"<td{css_class}>{escape(value)}</td>"
+
+
+def _is_numeric_text(value: str) -> bool:
+    try:
+        Decimal(value)
+    except (InvalidOperation, ValueError):
+        return False
+    return True
 
 
 def _html_chart(report_dir: Path, filename: str, title: str) -> str:
@@ -913,7 +943,7 @@ def _chart_participant_share(dataset: CurrentReportDataset, path: Path) -> None:
         labels,
         [float(row["total_share"]) for row in dataset.by_participant],
         [colors[label] for label in labels],
-        "Доли участников",
+        chart_display_title("participant_share.png"),
         "Доля расходов",
     )
 
@@ -1027,7 +1057,15 @@ def _typed_value(raw_value: str, header: str, row: list[str]):
 def _is_money(header: str, row: list[str]) -> bool:
     if header == "payer_total":
         return True
-    money_headers = {"Сумма", "Оплачено", "Доля расходов", "Доля", "Баланс", "Доля, %"}
+    money_headers = {
+        "Сумма",
+        "Оплачено",
+        "Доля расходов",
+        "Доля",
+        "Баланс",
+        "Доля, %",
+        "Доля оплат, %",
+    }
     money_summary = {"Общая сумма", "Средний чек"}
     return header in money_headers or (header == "Значение" and row and row[0] in money_summary)
 
@@ -1050,6 +1088,9 @@ def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
         return
     row = 3
     for chart_path in chart_paths:
+        worksheet.cell(row, 1, chart_display_title(chart_path))
+        worksheet.cell(row, 1).font = Font(bold=True, color=primary)
+        row += 1
         image = Image(chart_path)
         if image.width > 900:
             ratio = 900 / image.width

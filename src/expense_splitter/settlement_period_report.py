@@ -41,6 +41,7 @@ from expense_splitter.models import (
 )
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
+from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
 from expense_splitter.settlement_periods import get_settlement_period
 from expense_splitter.ui_labels import (
     label_for_period_status,
@@ -60,7 +61,7 @@ TABLE_SPECS = (
     ("purchases.csv", "Покупки периода"),
     ("by_category.csv", "Расходы по категориям"),
     ("by_payer.csv", "Расходы по плательщикам"),
-    ("by_participant.csv", "Доли участников"),
+    ("by_participant.csv", "Объем расходов на человека"),
     ("balances.csv", "Балансы"),
     ("settlements.csv", "Итоговые переводы"),
     ("warnings.csv", "Предупреждения"),
@@ -70,7 +71,7 @@ SETTLEMENT_PERIOD_PDF_TABLES = (
     PdfTableSpec("summary.csv", "Сводка"),
     PdfTableSpec("by_category.csv", "Расходы по категориям"),
     PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Доли участников"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
     PdfTableSpec("balances.csv", "Балансы"),
     PdfTableSpec("settlements.csv", "Итоговые переводы"),
     PdfTableSpec("purchases.csv", "Покупки периода"),
@@ -142,7 +143,7 @@ def build_settlement_period_report_dataset(
         settlements=list(period.settlements),
         summary=summary,
         by_category=_with_share_percent(aggregate_by_category(selected), total_amount),
-        by_payer=aggregate_by_payer(selected),
+        by_payer=aggregate_by_payer(selected, total_amount),
         by_participant=aggregate_by_participant(selected, participant_names) if selected else [],
         top_purchases=build_top_purchases(selected) if selected else [],
         warnings=warnings,
@@ -263,8 +264,16 @@ def write_settlement_period_csv_tables(
         ),
         (
             "by_payer.csv",
-            ["Плательщик", "Оплачено", "Покупок"],
-            ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+            ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"],
+            (
+                [
+                    row["payer"],
+                    row["total_paid"],
+                    row["purchase_count"],
+                    row["payer_share_percent"],
+                ]
+                for row in dataset.by_payer
+            ),
         ),
         (
             "by_participant.csv",
@@ -365,12 +374,15 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Расходы по плательщикам",
-        ["Плательщик", "Оплачено", "Покупок"],
-        ([row["payer"], row["total_paid"], row["purchase_count"]] for row in dataset.by_payer),
+        ["Плательщик", "Оплачено", "Покупок", "Доля оплат, %"],
+        (
+            [row["payer"], row["total_paid"], row["purchase_count"], row["payer_share_percent"]]
+            for row in dataset.by_payer
+        ),
     )
     _append_markdown_table(
         lines,
-        "Доли участников",
+        "Объем расходов на человека",
         ["Участник", "Доля расходов", "Покупок"],
         (
             [row["participant"], row["total_share"], row["purchase_count"]]
@@ -419,7 +431,8 @@ def write_settlement_period_markdown(
     if chart_paths:
         lines.extend(["## Графики", ""])
         for chart_path in chart_paths:
-            lines.extend([f"![{chart_path.stem}](charts/{chart_path.name})", ""])
+            title = chart_display_title(chart_path)
+            lines.extend([f"![{title}](charts/{chart_path.name})", ""])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -508,7 +521,11 @@ def write_settlement_period_xlsx(path: Path, tables_dir: Path, charts_dir: Path)
     )
     for sheet_name, filename in sheets:
         worksheet = workbook.create_sheet(sheet_name)
-        _write_sheet(worksheet, sheet_name, _read_csv(tables_dir / filename))
+        _write_sheet(
+            worksheet,
+            sheet_name,
+            rows_for_visual_table(filename, _read_csv(tables_dir / filename)),
+        )
     charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
     _write_charts_sheet(charts_sheet, charts_dir)
     workbook.active = 0

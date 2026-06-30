@@ -1150,3 +1150,21 @@ CLI options, YAML schema и `metadata.json` сохраняют техничес�
 - Generated artifacts (`reports/`, `.tmp/`, `build/`, `dist/`, caches, `*.bak`) остаются ignored и
   не должны попадать в staging.
 - Пользовательские `data/*.yaml` остаются локальными данными и не включаются в source commit.
+
+## P2.RPT.4 — Доля оплат в таблице расходов по плательщикам
+
+Дата: 2026-06-30
+Статус: реализуется локально; финальные проверки, commit, push и CI фиксируются в ответе этапа.
+
+### Изменения
+
+| Файл/область | Изменение |
+|---|---|
+| `src/expense_splitter/analytics.py` | `aggregate_by_payer` добавляет `payer_share_percent`; расчет выполняется Decimal-арифметикой от общей суммы отчета |
+| Analytics/current/settlement reports | В CSV, Markdown, HTML, XLSX и PDF появилась колонка `Доля оплат, %` в таблице `Расходы по плательщикам` |
+| `src/expense_splitter/settlement_period_report.py` | Для settlement-period report доля считается от snapshot `total_amount`, чтобы не менять исторический источник истины |
+| HTML reports | Числовые ячейки получают правое выравнивание и tabular numbers |
+| Tests | Добавлены проверки dataset, CSV, Markdown, HTML и XLSX для analytics/current/settlement-period отчетов |
+
+Формула: `paid_amount / total_amount * 100`, округление до двух знаков. Если общая сумма равна нулю,
+отчет выводит `0.00`.

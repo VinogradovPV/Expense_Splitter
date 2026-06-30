@@ -125,8 +125,34 @@ def test_aggregate_by_payer_sorts_by_total_paid():
 
     rows = aggregate_by_payer(purchases)
 
-    assert rows[0] == {"payer": "Alice", "purchase_count": 1, "total_paid": Decimal("120.00")}
-    assert rows[1] == {"payer": "Bob", "purchase_count": 1, "total_paid": Decimal("60.00")}
+    assert rows[0] == {
+        "payer": "Alice",
+        "purchase_count": 1,
+        "total_paid": Decimal("120.00"),
+        "payer_share_percent": Decimal("66.67"),
+    }
+    assert rows[1] == {
+        "payer": "Bob",
+        "purchase_count": 1,
+        "total_paid": Decimal("60.00"),
+        "payer_share_percent": Decimal("33.33"),
+    }
+    assert sum(row["payer_share_percent"] for row in rows) == Decimal("100.00")
+
+
+def test_aggregate_by_payer_zero_total_share_is_zero():
+    purchase = Purchase(
+        id="zero",
+        date=date(2026, 6, 5),
+        amount=Decimal("10.00"),
+        payer="Alice",
+        participants=["Alice"],
+        purchase_name="Adjustment",
+    )
+
+    rows = aggregate_by_payer([purchase], Decimal("0.00"))
+
+    assert rows[0]["payer_share_percent"] == Decimal("0.00")
 
 
 def test_aggregate_by_participant_uses_existing_split_logic():

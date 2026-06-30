@@ -43,6 +43,11 @@ def test_html_report_is_offline_utf8_and_links_artifacts(tmp_path):
     assert '<meta charset="UTF-8">' in text
     assert "Expense Splitter — аналитика расходов" in text
     assert "Общая сумма" in text
+    assert "Доля оплат, %" in text
+    assert "Объем расходов на человека" in text
+    assert "payer_total" not in text
+    assert "payer_rank" not in text
+    assert 'class="num"' in text
     assert 'href="tables/purchases.csv"' in text
     assert 'href="analytics_report.md"' in text
     assert 'src="charts/spending_by_category.png"' in text

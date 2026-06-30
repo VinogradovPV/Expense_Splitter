@@ -13,6 +13,7 @@ from expense_splitter.analytics_html import write_html_report
 from expense_splitter.analytics_xlsx import write_xlsx_report
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
+from expense_splitter.report_tables import chart_display_title
 from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 
 SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "pdf", "all"}
@@ -21,7 +22,7 @@ ANALYTICS_PDF_TABLES = (
     PdfTableSpec("summary.csv", "Сводка"),
     PdfTableSpec("by_category.csv", "Расходы по категориям"),
     PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Доли участников"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
     PdfTableSpec("balances.csv", "Балансы"),
     PdfTableSpec("settlements.csv", "Переводы"),
     PdfTableSpec("purchases.csv", "Покупки"),
@@ -136,8 +137,16 @@ def write_csv_tables(
         ),
         (
             "by_payer.csv",
-            ["Плательщик", "Количество покупок", "Оплачено"],
-            ([row["payer"], row["purchase_count"], row["total_paid"]] for row in dataset.by_payer),
+            ["Плательщик", "Количество покупок", "Оплачено", "Доля оплат, %"],
+            (
+                [
+                    row["payer"],
+                    row["purchase_count"],
+                    row["total_paid"],
+                    row["payer_share_percent"],
+                ]
+                for row in dataset.by_payer
+            ),
         ),
         (
             "by_participant.csv",
@@ -223,7 +232,6 @@ def write_markdown_report(
         lines,
         "Покупки",
         [
-            "ID",
             "Дата",
             "Покупка",
             "Сумма",
@@ -232,7 +240,10 @@ def write_markdown_report(
             "Категория",
             "Комментарий",
         ],
-        _purchase_rows(dataset),
+        (
+            [row[1], row[2], row[3], row[4], row[5], row[6], row[7]]
+            for row in _purchase_rows(dataset)
+        ),
     )
     _append_markdown_table(
         lines,
@@ -246,12 +257,15 @@ def write_markdown_report(
     _append_markdown_table(
         lines,
         "Расходы по плательщикам",
-        ["Плательщик", "Покупок", "Оплачено"],
-        ([row["payer"], row["purchase_count"], row["total_paid"]] for row in dataset.by_payer),
+        ["Плательщик", "Покупок", "Оплачено", "Доля оплат, %"],
+        (
+            [row["payer"], row["purchase_count"], row["total_paid"], row["payer_share_percent"]]
+            for row in dataset.by_payer
+        ),
     )
     _append_markdown_table(
         lines,
-        "Доли участников",
+        "Объем расходов на человека",
         ["Участник", "Покупок", "Доля"],
         (
             [row["participant"], row["purchase_count"], row["total_share"]]
@@ -291,7 +305,8 @@ def write_markdown_report(
     if chart_paths:
         lines.extend(["## Графики", ""])
         for chart_path in chart_paths:
-            lines.extend([f"![{chart_path.stem}](charts/{chart_path.name})", ""])
+            title = chart_display_title(chart_path)
+            lines.extend([f"![{title}](charts/{chart_path.name})", ""])
 
     lines.extend(["## Файлы", "", "- CSV-таблицы: `tables/`", "- PNG-графики: `charts/`", ""])
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Sequence
 
+from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
 FONT_CANDIDATES = (
@@ -123,7 +125,7 @@ def write_pdf_report(
         csv_path = tables_dir / spec.filename
         story.append(tools["Paragraph"](spec.title, styles["Heading2"]))
         if csv_path.is_file():
-            rows = _read_csv(csv_path)
+            rows = rows_for_visual_table(spec.filename, _read_csv(csv_path))
             story.append(_build_table(rows, styles, doc.width, compact=True, tools=tools))
         else:
             story.append(tools["Paragraph"]("Таблица не создана.", styles["BodyText"]))
@@ -134,7 +136,7 @@ def write_pdf_report(
         story.append(tools["PageBreak"]())
         story.append(tools["Paragraph"]("Графики", styles["Heading2"]))
         for chart_path in chart_paths:
-            story.append(tools["Paragraph"](chart_path.stem, styles["Heading3"]))
+            story.append(tools["Paragraph"](chart_display_title(chart_path), styles["Heading3"]))
             story.append(_image(chart_path, doc.width, doc.height * 0.72, tools))
             story.append(tools["Spacer"](1, 0.25 * tools["cm"]))
 

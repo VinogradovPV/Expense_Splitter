@@ -67,7 +67,7 @@ REPORT_SHEET_LABELS = {
     "Purchases": "Покупки",
     "By Category": "По категориям",
     "By Payer": "По плательщикам",
-    "By Participant": "По участникам",
+    "By Participant": "Объем расходов на человека",
     "Balances": "Балансы участников",
     "Settlements": "Итоговые переводы",
     "Top Purchases": "Крупнейшие покупки",
