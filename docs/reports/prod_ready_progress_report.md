@@ -1206,7 +1206,7 @@ Artifacts вручную не загружались.
 ## P3.REL.2 — Tag-triggered Build Release verification
 
 Дата: 2026-06-30
-Статус: partial; tag-triggered build successful, release policy blocker fixed, local artifact smoke blocked by download instability.
+Статус: completed with accepted limitations; tag-triggered build successful, release policy blocker fixed, local artifact download issue classified as non-blocking connection problem.
 
 ### RC tag
 
@@ -1239,10 +1239,13 @@ Artifacts вручную не загружались.
 - Fallback `gh release download v0.1.1-rc.1 --pattern "*.exe"` partially downloaded Windows assets,
   but incomplete files failed PyInstaller smoke (`Could not load PyInstaller's embedded PKG archive`).
 - Release asset metadata shows expected Windows `.exe` assets and Linux executables with non-zero
-  sizes and SHA-256 digests, but local executable smoke remains blocked until artifacts can be
-  downloaded completely.
+  sizes and SHA-256 digests.
+- User decision: classify local artifact download failures as a connection problem, not a project
+  release blocker. Do not count smoke on partially downloaded files.
 
 ### Decision
 
-Do not proceed to final release yet. Create a new RC tag after the workflow fix, verify that GitHub
-marks it as prerelease, then repeat artifact download and clean-machine smoke.
+Tag-triggered Build Release is verified. Before final release, use the workflow fix from
+`175e435250a5b4d7637cd41dc4eb406e2fb9fb66`; if another RC is created, verify that GitHub marks it
+as prerelease. Clean-machine artifact smoke remains recommended when network conditions allow full
+downloads, but the connection issue is not blocking release workflow validation.

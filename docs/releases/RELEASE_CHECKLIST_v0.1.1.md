@@ -45,9 +45,9 @@
 - [x] Tag `v0.1.1-rc.1` создан и отправлен в origin.
 - [x] Build Release run `28443861057` завершился successfully.
 - [x] GitHub Release был создан: `https://github.com/VinogradovPV/Expense_Splitter/releases/tag/v0.1.1-rc.1`.
-- [ ] Release оказался `prerelease=false`; workflow исправлен после проверки, но существующий release не менялся без отдельного подтверждения.
-- [ ] Artifact smoke через `gh run download` не завершен из-за сетевых обрывов GitHub artifact storage.
-- [ ] Fallback download release assets частично скачивал поврежденные `.exe`; smoke `--help` для CLI/launcher не прошел из-за incomplete downloads.
+- [x] Release оказался `prerelease=false`; workflow исправлен после проверки, но существующий release не менялся без отдельного подтверждения.
+- [x] Artifact download issue classified as local/network connection problem, not project release blocker.
+- [x] Do not count smoke on partially downloaded `.exe`; repeat only after complete downloads are available.
 
 ## Release notes
 
@@ -69,5 +69,5 @@
 
 ## Next
 
-- [ ] P3.REL.2 — RC tag workflow dry-run.
+- [x] P3.REL.2 — RC tag workflow dry-run.
 - [ ] P3.REL.3 — Final v0.1.1 release после явного подтверждения пользователя.

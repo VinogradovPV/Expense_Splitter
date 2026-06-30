@@ -98,5 +98,6 @@ GitHub Release. Проверка выявила, что RC release был опу
 prerelease.
 
 Скачивание artifacts на локальную машину было нестабильным: `gh run download` и fallback download
-release assets прерывались сетевыми ошибками, поэтому clean local executable smoke для скачанных
-artifacts нужно повторить на следующем RC tag или в более стабильной сети.
+release assets прерывались сетевыми ошибками. Пользователь классифицировал это как проблему
+соединения, а не release-blocker проекта. Smoke на частично скачанных `.exe` не засчитывается;
+clean local executable smoke рекомендуется повторить, когда artifacts удастся скачать полностью.
