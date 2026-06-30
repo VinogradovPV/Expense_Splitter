@@ -1290,3 +1290,37 @@ downloads, but the connection issue is not blocking release workflow validation.
 Не создавать cloud-ветку, Telegram bot, cloud resources, новые tags или releases в рамках TG-PREP.0.
 Следующий безопасный шаг: TG-PREP.1 — синхронизировать release-документы и решить maintenance-хвосты
 перед созданием `cloud/telegram-prep`.
+
+## TG-PREP.1 — P3.REL hygiene перед новой архитектурой
+
+Дата: 2026-06-30
+Статус: implemented locally; full quality gate, commit и push pending из-за недоступности
+outside-sandbox запуска проверок в текущем API-сеансе.
+
+### Что проверено
+
+- `docs/releases/RELEASE_NOTES_v0.1.1.md`
+- `docs/releases/RELEASE_CHECKLIST_v0.1.1.md`
+- `docs/reports/prod_ready_progress_report.md`
+- `.github/workflows/build-release.yml`
+- `pyproject.toml`
+
+### Что исправлено
+
+- Release notes больше не утверждают, что tag не создан без уточнения последующих P3.REL.2 событий.
+- RC tag `v0.1.1-rc.1`, успешный `Build Release` workflow и исправление `prerelease` отражены в
+  release docs.
+- Smoke на частично скачанных `.exe` явно не засчитывается; проблема download классифицирована как
+  network issue.
+- Зафиксирован release-history mismatch: remote tag и GitHub Release `v0.1.1` уже существуют и
+  указывают на старый commit `c6b4c8d`, тогда как текущий baseline ветки — `7e15112`.
+- `.github/workflows/build-release.yml` уже содержит
+  `prerelease: ${{ contains(github.ref_name, '-rc.') }}` для будущих RC tags.
+- `pyproject.toml`: dependency `typer[all]>=0.12` заменена на `typer>=0.12`, так как `rich` указан
+  отдельной runtime dependency.
+
+### Decision
+
+Не удалять, не пересоздавать и не публиковать tags/releases автоматически. Перед финальной
+release-процедурой нужно отдельное решение пользователя по существующему `v0.1.1`. Перед commit
+TG-PREP.1 нужно выполнить полный quality gate, потому что изменен `pyproject.toml`.
