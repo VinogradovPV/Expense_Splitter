@@ -89,3 +89,14 @@ Release workflow должен собирать artifacts заново в GitHub 
 Tag не создан. GitHub Release не опубликован. Artifacts вручную не загружались.
 
 Следующий рекомендуемый шаг: `P3.REL.2 — RC tag workflow dry-run`.
+
+## P3.REL.2 RC verification note
+
+Для tag `v0.1.1-rc.1` workflow `Build Release` успешно собрал Linux и Windows artifacts и создал
+GitHub Release. Проверка выявила, что RC release был опубликован как обычный release
+(`prerelease=false`). Workflow исправлен так, чтобы будущие tags вида `*-rc.*` публиковались как
+prerelease.
+
+Скачивание artifacts на локальную машину было нестабильным: `gh run download` и fallback download
+release assets прерывались сетевыми ошибками, поэтому clean local executable smoke для скачанных
+artifacts нужно повторить на следующем RC tag или в более стабильной сети.

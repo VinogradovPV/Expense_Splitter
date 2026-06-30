@@ -37,7 +37,17 @@
 - [x] Artifact upload использует runner-local `dist/*`.
 - [x] Локальный `dist/` текущей машины не участвует в workflow.
 - [x] GitHub Release job ограничен tag refs: `startsWith(github.ref, 'refs/tags/v')`.
-- [ ] Перед RC tag проверить, что workflow behavior приемлем для prerelease policy.
+- [x] Для будущих RC tags `*-rc.*` workflow передает `prerelease: true`.
+- [ ] Повторить RC tag workflow после workflow fix на новом RC tag.
+
+## P3.REL.2 result for v0.1.1-rc.1
+
+- [x] Tag `v0.1.1-rc.1` создан и отправлен в origin.
+- [x] Build Release run `28443861057` завершился successfully.
+- [x] GitHub Release был создан: `https://github.com/VinogradovPV/Expense_Splitter/releases/tag/v0.1.1-rc.1`.
+- [ ] Release оказался `prerelease=false`; workflow исправлен после проверки, но существующий release не менялся без отдельного подтверждения.
+- [ ] Artifact smoke через `gh run download` не завершен из-за сетевых обрывов GitHub artifact storage.
+- [ ] Fallback download release assets частично скачивал поврежденные `.exe`; smoke `--help` для CLI/launcher не прошел из-за incomplete downloads.
 
 ## Release notes
 

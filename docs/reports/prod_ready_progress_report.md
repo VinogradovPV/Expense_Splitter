@@ -1202,3 +1202,47 @@ Remote tag не создан. `git push origin v...` не выполнялся. 
 Artifacts вручную не загружались.
 
 Следующий рекомендуемый этап: `P3.REL.2 — RC tag workflow dry-run`.
+
+## P3.REL.2 — Tag-triggered Build Release verification
+
+Дата: 2026-06-30
+Статус: partial; tag-triggered build successful, release policy blocker fixed, local artifact smoke blocked by download instability.
+
+### RC tag
+
+- Tag: `v0.1.1-rc.1`
+- Target HEAD: `14fc179863903713da9364b1b66d41182850c3d5`
+- Push to origin: completed; tag exists on GitHub.
+
+### Workflow
+
+- Workflow: `Build Release`
+- Run ID: `28443861057`
+- Result: `completed success`
+- Linux build: success.
+- Windows build: success.
+- Release job: success.
+
+### Release check
+
+- URL: `https://github.com/VinogradovPV/Expense_Splitter/releases/tag/v0.1.1-rc.1`
+- Assets were published for Linux and Windows.
+- Finding: RC release was created with `draft=false` and `prerelease=false`.
+- Fix: `.github/workflows/build-release.yml` now sets
+  `prerelease: ${{ contains(github.ref_name, '-rc.') }}` for future RC tags.
+- Existing `v0.1.1-rc.1` release was not edited without explicit user confirmation.
+
+### Artifact verification
+
+- `gh run download 28443861057 --dir .tmp\release_artifacts_v0_1_1_rc1` failed repeatedly with
+  GitHub storage/network `wsarecv` interruptions.
+- Fallback `gh release download v0.1.1-rc.1 --pattern "*.exe"` partially downloaded Windows assets,
+  but incomplete files failed PyInstaller smoke (`Could not load PyInstaller's embedded PKG archive`).
+- Release asset metadata shows expected Windows `.exe` assets and Linux executables with non-zero
+  sizes and SHA-256 digests, but local executable smoke remains blocked until artifacts can be
+  downloaded completely.
+
+### Decision
+
+Do not proceed to final release yet. Create a new RC tag after the workflow fix, verify that GitHub
+marks it as prerelease, then repeat artifact download and clean-machine smoke.
