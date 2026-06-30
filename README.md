@@ -287,6 +287,8 @@ include machine-readable `payer_total` and `payer_rank` columns.
 
 ## Roadmap
 
+- Release dry-run notes: [v0.1.1 release notes](docs/releases/RELEASE_NOTES_v0.1.1.md)
+  and [v0.1.1 checklist](docs/releases/RELEASE_CHECKLIST_v0.1.1.md).
 - P2.REL.1 — release quality gate и проверка standalone-сборки;
 - release tag и публикация проверенных Windows artifacts;
 - дальнейшие улучшения UX без изменения стабильного расчётного ядра.

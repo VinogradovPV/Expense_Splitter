@@ -1168,3 +1168,37 @@ CLI options, YAML schema и `metadata.json` сохраняют техничес�
 
 Формула: `paid_amount / total_amount * 100`, округление до двух знаков. Если общая сумма равна нулю,
 отчет выводит `0.00`.
+
+## P3.REL.1 — Release tag dry-run plan
+
+Дата: 2026-06-30
+Статус: dry-run completed; tag, GitHub Release и artifact upload не выполнялись.
+
+### Version decision
+
+- `pyproject.toml` содержит `version = "0.1.1"`.
+- Рекомендуемый release tag для текущего HEAD: `v0.1.1`.
+- Если нужен RC перед финальным релизом: `v0.1.1-rc.1`.
+- `v0.1.0` не рекомендуется для текущего HEAD, потому что версия пакета уже `0.1.1`.
+
+### Подготовленные документы
+
+- `docs/releases/RELEASE_NOTES_v0.1.1.md`
+- `docs/releases/RELEASE_CHECKLIST_v0.1.1.md`
+
+### Workflow safety
+
+- `.github/workflows/build-release.yml` запускается вручную через `workflow_dispatch` или по tag
+  `v*.*.*`.
+- Build jobs выполняют `actions/checkout`, устанавливают зависимости, прогоняют tests/compileall и
+  собирают PyInstaller artifacts внутри GitHub runner.
+- Artifact upload использует runner-local `dist/*`; локальный `dist/` текущей машины не
+  публикуется workflow.
+- GitHub Release job ограничен tag refs через `startsWith(github.ref, 'refs/tags/v')`.
+
+### Safety decision
+
+Remote tag не создан. `git push origin v...` не выполнялся. GitHub Release не опубликован.
+Artifacts вручную не загружались.
+
+Следующий рекомендуемый этап: `P3.REL.2 — RC tag workflow dry-run`.
