@@ -1121,3 +1121,32 @@ browser dependencies не используются.
 CLI options, YAML schema и `metadata.json` сохраняют технические значения `open/all/closed/reopened`
 для совместимости и автоматизации. CSV может содержать технические machine-readable поля вроде
 `payer_total` и `payer_rank`; визуальные отчеты показывают пользовательские русские подписи.
+
+## P2.REL.1 — Release quality gate and standalone build readiness
+
+Дата: 2026-06-30
+Статус: release gate пройден; standalone Windows build проверен.
+
+### Проверки
+
+| Проверка | Статус | Результат |
+|---|---|---|
+| `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"` | OK manual | Dev/install зависимости установлены |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | OK manual | Полный test suite зеленый |
+| `.\.venv\Scripts\python.exe -m compileall -q src tests` | OK manual | Синтаксис src/tests корректен |
+| `.\.venv\Scripts\python.exe -m ruff check src tests` | OK manual | Ruff без замечаний |
+| `.\.venv\Scripts\python.exe scripts\qa\check_text_encoding.py` | OK manual | UTF-8/mojibake guard зеленый |
+| `git diff --check` | OK manual | Whitespace errors не найдены |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1 -NoUpx` | OK manual | PyInstaller standalone build создан |
+| `.\dist\expense-splitter.exe --help` | OK manual | Standalone CLI запускается |
+| `.\dist\expense-splitter-launcher.exe --help` | OK manual | Standalone launcher запускается |
+| `.\dist\expense-splitter-gui.exe --help` | OK manual | Standalone GUI entry point запускается без Tk event loop |
+| Analytics CLI smoke `month/quarter/year --format all` | OK outside sandbox | Isolated `.tmp\p2_rel_1_smoke`; HTML/XLSX/PDF созданы для трех периодов |
+
+### Release readiness
+
+- Settlement periods, current-report, settlement-period report, analytics reports, GUI directory
+  management, PDF output, русские пользовательские labels и standalone entry points проверены.
+- Generated artifacts (`reports/`, `.tmp/`, `build/`, `dist/`, caches, `*.bak`) остаются ignored и
+  не должны попадать в staging.
+- Пользовательские `data/*.yaml` остаются локальными данными и не включаются в source commit.
