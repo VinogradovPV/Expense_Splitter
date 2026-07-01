@@ -104,6 +104,8 @@ Prerequisite:
 
 ## CLOUD.8 — Yandex Cloud Deployment MVP
 
+Status: deployment package prepared; real cloud deployment requires explicit operator confirmation.
+
 Цель:
 
 - deployment docs/config;
