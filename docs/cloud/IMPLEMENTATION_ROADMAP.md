@@ -90,6 +90,8 @@ Security:
 
 ## CLOUD.7 — Telegram Bot MVP
 
+Status: completed as framework-neutral MVP adapter; real webhook/long polling deployment is future work.
+
 Цель:
 
 - implement bot adapter;

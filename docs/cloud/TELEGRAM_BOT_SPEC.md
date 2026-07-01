@@ -1,7 +1,7 @@
 # CLOUD.0 — Telegram Bot Spec
 
 Дата: 2026-07-01
-Статус: UX/spec design; production bot code не создавался.
+Статус: UX/spec design plus CLOUD.7 framework-neutral Telegram bot MVP adapter.
 
 ## Цель
 
@@ -41,16 +41,43 @@ Message:
 Shows commands:
 
 - `/add_purchase` — добавить покупку;
+- `/edit_purchase` — исправить открытую покупку;
+- `/delete_purchase` — удалить открытую покупку с точным подтверждением;
 - `/current_pdf` — текущие взаиморасчеты PDF;
 - `/current_xlsx` — текущие взаиморасчеты XLSX;
 - `/analytics` — отчет за месяц/квартал/год;
 - `/periods` — список периодов взаиморасчетов;
 - `/period_report` — отчет по закрытому периоду;
+- `/close_period` — закрыть период с точным подтверждением;
 - `/cancel` — отменить текущий диалог.
 
 ### `/add_purchase`
 
 Starts conversational flow for adding purchase.
+
+### `/edit_purchase`
+
+Updates an existing open purchase through `PurchaseService.update_purchase`.
+
+Example:
+
+```text
+/edit_purchase p1 amount=1250 category=еда comment=исправлено
+```
+
+Settled purchases are protected by service layer.
+
+### `/delete_purchase`
+
+Deletes an open purchase through `PurchaseService.delete_purchase`.
+
+The command requires exact marker:
+
+```text
+/delete_purchase p1 DELETE_PURCHASE
+```
+
+Without the marker, bot returns a warning and does not change data.
 
 ### `/current_pdf`
 
@@ -88,6 +115,18 @@ Lists settlement periods:
 ### `/period_report`
 
 Asks user to choose settlement period and format. Uses historical snapshot report.
+
+### `/close_period`
+
+Closes a settlement period through `SettlementService.close_period`.
+
+The command requires exact marker:
+
+```text
+/close_period from=2026-07-01 to=2026-07-31 name=Июль confirm=CLOSE_PERIOD
+```
+
+Without `confirm=CLOSE_PERIOD`, bot returns a warning and does not change data.
 
 ### `/cancel`
 
