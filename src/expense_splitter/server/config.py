@@ -21,6 +21,8 @@ class ServerSettings:
     object_storage_bucket: str | None = None
     object_storage_prefix: str = "reports"
     database_url: str | None = None
+    telegram_webhook_secret: str | None = None
+    rate_limit_per_minute: int = 60
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "ServerSettings":
@@ -38,6 +40,11 @@ class ServerSettings:
             object_storage_bucket=values.get("YANDEX_OBJECT_STORAGE_BUCKET"),
             object_storage_prefix=values.get("EXPENSE_SPLITTER_OBJECT_PREFIX", "reports"),
             database_url=values.get("DATABASE_URL"),
+            telegram_webhook_secret=values.get("TELEGRAM_WEBHOOK_SECRET"),
+            rate_limit_per_minute=_positive_int(
+                values.get("EXPENSE_SPLITTER_RATE_LIMIT_PER_MINUTE", "60"),
+                "EXPENSE_SPLITTER_RATE_LIMIT_PER_MINUTE",
+            ),
         )
 
 
@@ -53,3 +60,13 @@ def _report_storage_backend(value: str) -> ReportStorageBackend:
             "EXPENSE_SPLITTER_REPORT_STORAGE must be local, temp, or object_storage."
         )
     return value  # type: ignore[return-value]
+
+
+def _positive_int(value: str, env_name: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{env_name} must be an integer.") from exc
+    if parsed <= 0:
+        raise ValueError(f"{env_name} must be greater than zero.")
+    return parsed

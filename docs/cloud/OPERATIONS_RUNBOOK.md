@@ -130,3 +130,13 @@ If deployment fails after migration:
 - rate limits;
 - audit log persistence;
 - backup/restore drill.
+
+## CLOUD.9 gate result
+
+Current gate decision:
+
+```text
+not cloud ready — blockers
+```
+
+See `docs/cloud/PRODUCTION_HARDENING_GATE.md` for blockers and the next hardening stages.

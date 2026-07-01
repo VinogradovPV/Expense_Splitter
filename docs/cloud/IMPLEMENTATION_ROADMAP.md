@@ -120,6 +120,8 @@ Rules:
 
 ## CLOUD.9 — Production Hardening
 
+Status: completed as release gate assessment; decision is `not cloud ready — blockers`.
+
 Цель:
 
 - monitoring/alerts;

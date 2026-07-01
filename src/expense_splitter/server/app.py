@@ -10,7 +10,8 @@ from fastapi.responses import JSONResponse
 from expense_splitter.repositories import PostgresRepositoryNotImplementedError
 from expense_splitter.server.config import ServerSettings
 from expense_splitter.server.dependencies import create_services
-from expense_splitter.server.routes import health, purchases, reports, settlement_periods
+from expense_splitter.server.routes import health, purchases, reports, settlement_periods, telegram
+from expense_splitter.server.security import SECURITY_HEADERS
 from expense_splitter.storage import StorageError
 
 
@@ -29,6 +30,7 @@ def create_app(settings: ServerSettings | None = None) -> FastAPI:
     app.include_router(purchases.router)
     app.include_router(reports.router)
     app.include_router(settlement_periods.router)
+    app.include_router(telegram.router)
 
     app.add_exception_handler(ValueError, _value_error_handler)
     app.add_exception_handler(StorageError, _storage_error_handler)
@@ -36,6 +38,14 @@ def create_app(settings: ServerSettings | None = None) -> FastAPI:
         PostgresRepositoryNotImplementedError,
         _postgres_not_implemented_handler,
     )
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        return response
+
     return app
 
 

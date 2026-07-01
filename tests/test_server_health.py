@@ -34,6 +34,7 @@ def test_server_app_registers_mvp_routes(tmp_path):
     assert "/api/settlement-periods" in paths
     assert "/api/settlement-periods/close" in paths
     assert "/api/settlement-periods/{settlement_period_id}/reopen" in paths
+    assert "/telegram/webhook" in paths
 
 
 def test_health_endpoints_are_structured(tmp_path):
