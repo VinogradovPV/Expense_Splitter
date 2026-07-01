@@ -7,7 +7,7 @@ __pycache__/
 .mypy_cache/
 dist/
 build/
-reports/analytics/
+/reports/analytics/
 *.egg-info/
 .env
 .env.*
@@ -22,7 +22,7 @@ telegram_token*.txt
 ~$*.xlsx
 
 # Generated reports
-reports/
+/reports/
 
 # Local user data
 data/*.yaml

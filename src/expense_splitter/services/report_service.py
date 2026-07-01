@@ -1,13 +1,18 @@
-"""Thin report service wrapper around existing report generators."""
+"""Report service that returns delivery-ready report DTOs."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from expense_splitter.analytics import PeriodSpec, build_analytics_dataset
 from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.current_report import build_current_report_dataset, generate_current_report
+from expense_splitter.reports.output_adapters import (
+    LocalReportOutputAdapter,
+    ReportOutputAdapter,
+)
+from expense_splitter.reports.result import ReportResult
 from expense_splitter.repositories.protocols import (
     ParticipantRepository,
     PurchaseRepository,
@@ -18,28 +23,55 @@ from expense_splitter.settlement_period_report import (
     generate_settlement_period_report,
 )
 
-
-@dataclass(frozen=True)
-class ReportServiceResult:
-    report_id: str
-    report_type: str
-    formats: set[str]
-    output_dir: Path
-    files: list[Path]
+ReportServiceResult = ReportResult
 
 
 class ReportService:
-    """Service wrapper that returns structured report metadata."""
+    """Generate reports through an output adapter suitable for local or cloud delivery."""
 
     def __init__(
         self,
         purchases: PurchaseRepository,
         participants: ParticipantRepository,
         settlement_periods: SettlementPeriodRepository,
+        output_adapter: ReportOutputAdapter | None = None,
     ) -> None:
         self.purchases = purchases
         self.participants = participants
         self.settlement_periods = settlement_periods
+        self.output_adapter = output_adapter or LocalReportOutputAdapter()
+
+    def create_current_report(
+        self,
+        tenant_id: str,
+        scope: str = "open",
+        formats: set[str] | None = None,
+        output_root: Path = Path("reports/current_state"),
+    ) -> ReportResult:
+        requested_formats = _normalize_formats(formats)
+        created_at = _now()
+        dataset = build_current_report_dataset(
+            self.participants.list_participants(tenant_id),
+            self.purchases.list_purchases(tenant_id),
+            scope=scope,
+            generated_at=created_at,
+        )
+        report_dir = generate_current_report(
+            dataset,
+            output_root=self.output_adapter.output_root(output_root, "current"),
+            output_format=_single_generator_format(requested_formats),
+        )
+        return self.output_adapter.build_result(
+            tenant_id=tenant_id,
+            report_type="current",
+            report_id=scope,
+            formats=requested_formats,
+            report_dir=report_dir,
+            created_at=created_at,
+            telegram_caption=f"Отчет по текущим взаиморасчетам: {scope}",
+            warnings=list(dataset.warnings),
+            metadata={"scope": scope, "source": "repository_protocol"},
+        )
 
     def build_current_report(
         self,
@@ -47,19 +79,46 @@ class ReportService:
         scope: str = "open",
         formats: set[str] | None = None,
         output_root: Path = Path("reports/current_state"),
-    ) -> ReportServiceResult:
-        requested_formats = formats or {"all"}
-        dataset = build_current_report_dataset(
+    ) -> ReportResult:
+        return self.create_current_report(tenant_id, scope, formats, output_root)
+
+    def create_analytics_report(
+        self,
+        tenant_id: str,
+        period_spec: PeriodSpec,
+        formats: set[str] | None = None,
+        output_root: Path = Path("reports/analytics"),
+        include_undated: bool = False,
+    ) -> ReportResult:
+        requested_formats = _normalize_formats(formats)
+        created_at = _now()
+        dataset = build_analytics_dataset(
             self.participants.list_participants(tenant_id),
+            [],
             self.purchases.list_purchases(tenant_id),
-            scope=scope,
+            period_spec,
+            include_undated=include_undated,
         )
-        output_dir = generate_current_report(
+        report_dir = generate_analytics_report(
             dataset,
-            output_root=output_root,
+            output_root=self.output_adapter.output_root(output_root, "analytics"),
             output_format=_single_generator_format(requested_formats),
         )
-        return self._result("current", scope, requested_formats, output_dir)
+        return self.output_adapter.build_result(
+            tenant_id=tenant_id,
+            report_type="analytics",
+            report_id=period_spec.period_id,
+            formats=requested_formats,
+            report_dir=report_dir,
+            created_at=created_at,
+            telegram_caption=f"Аналитический отчет: {period_spec.period_id}",
+            warnings=list(dataset.warnings),
+            metadata={
+                "period": period_spec.period,
+                "period_id": period_spec.period_id,
+                "source": "repository_protocol",
+            },
+        )
 
     def build_analytics_report(
         self,
@@ -68,21 +127,52 @@ class ReportService:
         formats: set[str] | None = None,
         output_root: Path = Path("reports/analytics"),
         include_undated: bool = False,
-    ) -> ReportServiceResult:
-        requested_formats = formats or {"all"}
-        dataset = build_analytics_dataset(
-            self.participants.list_participants(tenant_id),
-            [],
-            self.purchases.list_purchases(tenant_id),
+    ) -> ReportResult:
+        return self.create_analytics_report(
+            tenant_id,
             period_spec,
-            include_undated=include_undated,
+            formats,
+            output_root,
+            include_undated,
         )
-        output_dir = generate_analytics_report(
+
+    def create_settlement_period_report(
+        self,
+        tenant_id: str,
+        settlement_period_id: str,
+        formats: set[str] | None = None,
+        output_root: Path = Path("reports/settlement_periods"),
+    ) -> ReportResult:
+        requested_formats = _normalize_formats(formats)
+        created_at = _now()
+        dataset = build_settlement_period_report_dataset(
+            self.settlement_periods.list_periods(tenant_id),
+            self.purchases.list_purchases(tenant_id),
+            self.participants.list_participants(tenant_id),
+            settlement_period_id,
+            generated_at=created_at,
+        )
+        report_dir = generate_settlement_period_report(
             dataset,
-            output_root=output_root,
+            output_root=self.output_adapter.output_root(output_root, "settlement_period"),
             output_format=_single_generator_format(requested_formats),
         )
-        return self._result("analytics", period_spec.period_id, requested_formats, output_dir)
+        return self.output_adapter.build_result(
+            tenant_id=tenant_id,
+            report_type="settlement_period",
+            report_id=settlement_period_id,
+            formats=requested_formats,
+            report_dir=report_dir,
+            created_at=created_at,
+            telegram_caption=f"Отчет по периоду взаиморасчетов: {settlement_period_id}",
+            warnings=list(dataset.warnings),
+            metadata={
+                "settlement_period_id": settlement_period_id,
+                "balance_source": dataset.balance_source,
+                "settlement_source": dataset.settlement_source,
+                "source": "repository_protocol",
+            },
+        )
 
     def build_settlement_period_report(
         self,
@@ -90,48 +180,28 @@ class ReportService:
         settlement_period_id: str,
         formats: set[str] | None = None,
         output_root: Path = Path("reports/settlement_periods"),
-    ) -> ReportServiceResult:
-        requested_formats = formats or {"all"}
-        dataset = build_settlement_period_report_dataset(
-            self.settlement_periods.list_periods(tenant_id),
-            self.purchases.list_purchases(tenant_id),
-            self.participants.list_participants(tenant_id),
+    ) -> ReportResult:
+        return self.create_settlement_period_report(
+            tenant_id,
             settlement_period_id,
-        )
-        output_dir = generate_settlement_period_report(
-            dataset,
-            output_root=output_root,
-            output_format=_single_generator_format(requested_formats),
-        )
-        return self._result(
-            "settlement_period",
-            settlement_period_id,
-            requested_formats,
-            output_dir,
+            formats,
+            output_root,
         )
 
-    @staticmethod
-    def _result(
-        report_type: str,
-        report_id: str,
-        formats: set[str],
-        output_dir: Path,
-    ) -> ReportServiceResult:
-        return ReportServiceResult(
-            report_id=report_id,
-            report_type=report_type,
-            formats=set(formats),
-            output_dir=output_dir,
-            files=sorted(path for path in output_dir.rglob("*") if path.is_file()),
-        )
+
+def _normalize_formats(formats: set[str] | None) -> set[str]:
+    return {item.lower() for item in (formats or {"all"})}
 
 
 def _single_generator_format(formats: set[str]) -> str:
-    normalized = {item.lower() for item in formats}
-    if not normalized:
+    if not formats:
         return "all"
-    if "all" in normalized:
+    if "all" in formats:
         return "all"
-    if len(normalized) != 1:
+    if len(formats) != 1:
         raise ValueError("Current report generators accept one format at a time.")
-    return next(iter(normalized))
+    return next(iter(formats))
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc).astimezone()
