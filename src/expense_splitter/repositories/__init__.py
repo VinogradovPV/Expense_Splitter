@@ -11,15 +11,23 @@ from expense_splitter.repositories.protocols import (
     ReportRequest,
     SettlementPeriodRepository,
 )
+from expense_splitter.repositories.yaml_repository import (
+    LOCAL_TENANT_ID,
+    YamlExpenseRepository,
+    YamlRepositoryTenantError,
+)
 
 __all__ = [
     "AddPurchaseCommand",
     "CategoryRepository",
     "ClosePeriodCommand",
     "ExpenseUnitOfWork",
+    "LOCAL_TENANT_ID",
     "ParticipantRepository",
     "PurchasePatch",
     "PurchaseRepository",
     "ReportRequest",
     "SettlementPeriodRepository",
+    "YamlExpenseRepository",
+    "YamlRepositoryTenantError",
 ]
