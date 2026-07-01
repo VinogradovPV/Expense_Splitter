@@ -1,7 +1,7 @@
 # CLOUD.0 — API Contract
 
 Дата: 2026-07-01
-Статус: API design; FastAPI code не создавался.
+Статус: API design plus CLOUD.6 FastAPI MVP adapter; Telegram bot, auth and live PostgreSQL repository are still future work.
 
 ## Цель
 
