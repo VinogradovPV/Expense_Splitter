@@ -559,3 +559,15 @@ Report builders должны получать данные уже с resolved di
 Серверная модель должна строиться вокруг stable IDs и tenant isolation. YAML display names
 мигрируются в display labels и aliases, но не становятся primary keys. Telegram identity связывается
 через `telegram_user_id -> user_id -> participant_id`, а все доменные операции пишут audit log.
+
+## CLOUD.5 Update
+
+CLOUD.5 created the executable PostgreSQL schema foundation:
+
+- `src/expense_splitter/db/migrations/0001_initial.sql`;
+- schema metadata in `src/expense_splitter/db/models.py`;
+- future PostgreSQL repository contract stub;
+- optional `cloud` dependencies for SQLAlchemy 2.x, Alembic and psycopg.
+
+The selected stable ID strategy for the first server schema is database-generated UUID via
+PostgreSQL `pgcrypto`/`gen_random_uuid()`. YAML offline mode is unchanged.

@@ -1,5 +1,10 @@
 """Repository contracts for future storage adapters."""
 
+from expense_splitter.repositories.postgres_repository import (
+    PostgresExpenseRepository,
+    PostgresRepositoryConfig,
+    PostgresRepositoryNotImplementedError,
+)
 from expense_splitter.repositories.protocols import (
     AddPurchaseCommand,
     CategoryRepository,
@@ -24,6 +29,9 @@ __all__ = [
     "ExpenseUnitOfWork",
     "LOCAL_TENANT_ID",
     "ParticipantRepository",
+    "PostgresExpenseRepository",
+    "PostgresRepositoryConfig",
+    "PostgresRepositoryNotImplementedError",
     "PurchasePatch",
     "PurchaseRepository",
     "ReportRequest",
