@@ -196,11 +196,31 @@ def pdf_font_healthcheck() -> dict[str, object]:
 
 def _select_report_files(report_dir: Path, formats: set[str]) -> list[Path]:
     normalized = {item.lower() for item in formats}
-    files = sorted(path for path in report_dir.rglob("*") if path.is_file())
+    files = _manifest_report_files(report_dir)
+    if files is None:
+        files = sorted(path for path in report_dir.rglob("*") if path.is_file())
     if "all" in normalized:
         return files
     suffixes = set().union(*(FORMAT_SUFFIXES.get(item, set()) for item in normalized))
     return [path for path in files if path.suffix.lower() in suffixes]
+
+
+def _manifest_report_files(report_dir: Path) -> list[Path] | None:
+    metadata = _read_metadata_json(report_dir)
+    raw_files = metadata.get("files")
+    if not isinstance(raw_files, list):
+        return None
+    paths: list[Path] = []
+    for raw_file in raw_files:
+        if not isinstance(raw_file, str):
+            continue
+        relative = Path(raw_file)
+        if relative.is_absolute() or ".." in relative.parts:
+            continue
+        path = report_dir / relative
+        if path.is_file():
+            paths.append(path)
+    return sorted(paths)
 
 
 def _report_file(

@@ -101,6 +101,7 @@ def write_pdf_report(
     tables_dir: Path,
     table_specs: Sequence[PdfTableSpec],
     charts_dir: Path | None = None,
+    chart_paths: Sequence[Path] | None = None,
 ) -> Path:
     tools = _load_reportlab_layout_tools()
     font_name = ensure_pdf_font()
@@ -132,12 +133,15 @@ def write_pdf_report(
             )
         story.append(tools["Spacer"](1, 0.35 * tools["cm"]))
 
-    chart_paths = sorted(charts_dir.glob("*.png")) if charts_dir and charts_dir.exists() else []
-    if chart_paths:
-        story.append(tools["Paragraph"]("Графики", styles["Heading2"]))
-        for chart_path in chart_paths:
-            story.append(_image(chart_path, doc.width, doc.height * 0.72, tools))
-            story.append(tools["Spacer"](1, 0.25 * tools["cm"]))
+    current_chart_paths = (
+        sorted(chart_paths, key=lambda item: item.name)
+        if chart_paths is not None
+        else sorted(charts_dir.glob("*.png"))
+        if charts_dir and charts_dir.exists()
+        else []
+    )
+    if current_chart_paths:
+        story.extend(_chart_section(current_chart_paths, styles, doc.width, doc.height, tools))
 
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.build(
@@ -146,6 +150,29 @@ def write_pdf_report(
         onLaterPages=lambda canvas, doc: _page_footer(canvas, doc, tools),
     )
     return path
+
+
+def _chart_section(
+    chart_paths: Sequence[Path],
+    styles,
+    width: float,
+    height: float,
+    tools: dict[str, Any],
+) -> list[object]:
+    first_chart, *remaining_charts = chart_paths
+    story: list[object] = [
+        tools["KeepTogether"](
+            [
+                tools["Paragraph"]("Графики", styles["Heading2"]),
+                _image(first_chart, width, height * 0.72, tools),
+            ]
+        ),
+        tools["Spacer"](1, 0.25 * tools["cm"]),
+    ]
+    for chart_path in remaining_charts:
+        story.append(_image(chart_path, width, height * 0.72, tools))
+        story.append(tools["Spacer"](1, 0.25 * tools["cm"]))
+    return story
 
 
 def _styles(font_name: str, tools: dict[str, Any]):

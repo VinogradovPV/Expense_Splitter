@@ -4,12 +4,15 @@ from pathlib import Path
 from typing import Sequence
 
 PURCHASE_DISPLAY_EXCLUDED_COLUMNS = {"id", "payer_total", "payer_rank"}
+BALANCE_RESULT_HEADER = "Итог: + получит, − должен"
+BALANCE_CHART_TITLE = "Кто должен и кому должны"
+BALANCE_CHART_XLABEL = "Сумма: − должен, + получит"
 BALANCE_EXPLANATION = (
     "Положительный итоговый баланс означает, что участнику должны вернуть деньги. "
     "Отрицательный итоговый баланс означает, что участник должен доплатить."
 )
 CHART_DISPLAY_TITLES = {
-    "balances.png": "Итоговые балансы",
+    "balances.png": BALANCE_CHART_TITLE,
     "period_trend.png": "Динамика расходов за период",
     "spending_by_category.png": "Расходы по категориям",
     "spending_by_payer.png": "Расходы по плательщикам",
@@ -23,7 +26,8 @@ VISUAL_HEADER_RENAMES = {
     },
     "balances.csv": {
         "Доля": "Объем расходов на человека",
-        "Баланс": "Итоговый баланс",
+        "Баланс": BALANCE_RESULT_HEADER,
+        "Итоговый баланс": BALANCE_RESULT_HEADER,
     },
 }
 

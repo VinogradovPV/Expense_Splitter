@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -104,6 +105,7 @@ class ReportService:
             output_root=self.output_adapter.output_root(output_root, "analytics"),
             output_format=_single_generator_format(requested_formats),
         )
+        warnings = _generated_warnings(report_dir, dataset.warnings)
         return self.output_adapter.build_result(
             tenant_id=tenant_id,
             report_type="analytics",
@@ -112,7 +114,7 @@ class ReportService:
             report_dir=report_dir,
             created_at=created_at,
             telegram_caption=f"Аналитический отчет: {period_spec.period_id}",
-            warnings=list(dataset.warnings),
+            warnings=warnings,
             metadata={
                 "period": period_spec.period,
                 "period_id": period_spec.period_id,
@@ -205,3 +207,20 @@ def _single_generator_format(formats: set[str]) -> str:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).astimezone()
+
+
+def _generated_warnings(
+    report_dir: Path,
+    fallback: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    metadata_path = report_dir / "metadata.json"
+    if not metadata_path.is_file():
+        return list(fallback)
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return list(fallback)
+    warnings = metadata.get("warnings")
+    if not isinstance(warnings, list):
+        return list(fallback)
+    return [dict(row) for row in warnings if isinstance(row, dict)]

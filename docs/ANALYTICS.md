@@ -106,7 +106,7 @@ reports/analytics/<year>/<period-id>/
     ├── spending_by_payer.png
     ├── participant_share.png
     ├── balances.png
-    ├── period_trend.png
+    ├── period_trend.png  # только если есть минимум две уникальные даты
     └── top_purchases.png
 ```
 
@@ -114,7 +114,13 @@ reports/analytics/<year>/<period-id>/
 
 Таблицы строятся из единого `AnalyticsDataset`; расчётная логика не дублируется в renderers.
 `warnings.csv` содержит покупки без даты и причины отсутствия графиков. Если данных нет, пустые
-графики не создаются, а HTML/XLSX показывают понятное сообщение.
+графики не создаются.
+
+График `period_trend.png` строится только при минимум двух уникальных датах покупок. Несколько
+покупок в один день агрегируются в дневную сумму, например `619.00 + 550.00 = 1169.00`. Если
+уникальная дата одна, график динамики пропускается, в warnings добавляется
+`chart_not_enough_data`, а `period_trend` не попадает в `metadata.files`, `charts_generated`, PDF,
+HTML, XLSX и delivery result.
 
 В таблице `Расходы по плательщикам` для analytics, current-report и settlement-period report есть
 колонка `Доля оплат, %`. Она показывает `оплачено плательщиком / общая сумма отчета * 100`, с

@@ -1337,11 +1337,13 @@ install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`
 |---|---|
 | PDF layout | Табличные секции собираются через общий block builder с `KeepTogether`; заголовок таблицы удерживается вместе с таблицей |
 | PDF pages | Убран безусловный `PageBreak` перед графиками; пустые страницы считаются дефектом |
-| Visual labels | `by_participant` показывает `Объем расходов на человека`; `balances` показывает `Объем расходов на человека` и `Итоговый баланс` |
+| Visual labels | `by_participant` показывает `Объем расходов на человека`; `balances` показывает `Объем расходов на человека` и `Итог: + получит, − должен` |
 | Balance explanation | PDF/HTML/Markdown добавляют пояснение знака итогового баланса |
 | Chart titles | Internal chart keys не выводятся пользователю; используются русские заголовки |
 | Chart axes | Расходные графики получают X scale from zero с правым запасом; balance chart сохраняет отрицательную область |
 | Period trend | Если дат меньше двух, `period_trend` не строится и выводится понятное предупреждение |
+| Period trend policy | `period_trend` использует дневную агрегацию, единое правило skip/build и manifest текущего запуска для PDF/ReportService |
+| Stale PNG protection | Аналитический отчет очищает известные chart-файлы перед генерацией и не включает старые PNG в `ReportResult.files` |
 | Warnings | Пустой visual-раздел предупреждений показывает `Предупреждений нет.` |
 | Analytics summary | Raw period values `month/quarter/year` заменены пользовательскими русскими подписями в visual summary |
 

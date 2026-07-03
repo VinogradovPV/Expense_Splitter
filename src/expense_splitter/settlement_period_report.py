@@ -43,6 +43,7 @@ from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.report_tables import (
     BALANCE_EXPLANATION,
+    BALANCE_RESULT_HEADER,
     chart_display_title,
     rows_for_visual_table,
 )
@@ -396,7 +397,7 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Балансы",
-        ["Участник", "Оплачено", "Объем расходов на человека", "Итоговый баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", BALANCE_RESULT_HEADER],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
     )
     lines.extend([BALANCE_EXPLANATION, ""])

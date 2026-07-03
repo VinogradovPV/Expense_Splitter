@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from datetime import date
 from pathlib import Path
+from typing import Sequence
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image
@@ -10,7 +11,11 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from expense_splitter.analytics import AnalyticsDataset
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    BALANCE_RESULT_HEADER,
+    chart_display_title,
+    rows_for_visual_table,
+)
 from expense_splitter.ui_labels import label_for_report_sheet
 
 SHEETS = (
@@ -33,7 +38,7 @@ MONEY_HEADERS = {
     "Баланс",
     "Доля оплат, %",
     "Объем расходов на человека",
-    "Итоговый баланс",
+    BALANCE_RESULT_HEADER,
 }
 INTEGER_HEADERS = {"Количество покупок", "Покупок", "Место"}
 SUMMARY_MONEY_LABELS = {"Общая сумма", "Средняя покупка"}
@@ -53,6 +58,7 @@ def write_xlsx_report(
     path: Path,
     tables_dir: Path,
     charts_dir: Path,
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
     workbook = Workbook()
     workbook.remove(workbook.active)
@@ -63,7 +69,7 @@ def write_xlsx_report(
         _write_table_sheet(worksheet, sheet_name, rows)
 
     charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
-    _write_charts_sheet(charts_sheet, charts_dir)
+    _write_charts_sheet(charts_sheet, charts_dir, chart_paths)
     workbook.active = 0
     workbook.calculation.fullCalcOnLoad = True
     workbook.calculation.forceFullCalc = True
@@ -172,22 +178,26 @@ def _set_widths(worksheet, headers: list[str], rows: list[list[str]]) -> None:
         worksheet.column_dimensions[get_column_letter(index)].width = width
 
 
-def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
+def _write_charts_sheet(
+    worksheet,
+    charts_dir: Path,
+    chart_paths: Sequence[Path] = (),
+) -> None:
     worksheet.sheet_view.showGridLines = False
     worksheet.merge_cells("A1:J1")
     worksheet["A1"] = "Графики аналитики"
     worksheet["A1"].font = Font(size=16, bold=True, color="FFFFFF")
     worksheet["A1"].fill = PatternFill("solid", fgColor=PRIMARY)
     worksheet.row_dimensions[1].height = 28
-    chart_paths = sorted(charts_dir.glob("*.png")) if charts_dir.exists() else []
-    if not chart_paths:
+    current_chart_paths = sorted(chart_paths, key=lambda item: item.name)
+    if not current_chart_paths:
         worksheet["A3"] = "Графики не созданы: нет данных за выбранный период."
         worksheet["A3"].font = Font(italic=True, color=MUTED)
         worksheet["A3"].fill = PatternFill("solid", fgColor=SECONDARY)
         return
 
     row = 3
-    for chart_path in chart_paths:
+    for chart_path in current_chart_paths:
         worksheet.cell(row, 1, chart_display_title(chart_path))
         worksheet.cell(row, 1).font = Font(bold=True, color=PRIMARY)
         row += 1

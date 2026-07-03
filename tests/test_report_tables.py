@@ -1,5 +1,6 @@
 from expense_splitter.report_tables import (
     BALANCE_EXPLANATION,
+    BALANCE_RESULT_HEADER,
     chart_display_title,
     rows_for_visual_table,
     visual_table_note,
@@ -33,7 +34,7 @@ def test_visual_rows_rename_money_share_headers():
         "balances.csv",
         [["Участник", "Оплачено", "Доля", "Баланс"], ["Alice", "100.00", "50.00", "50.00"]],
     ) == [
-        ["Участник", "Оплачено", "Объем расходов на человека", "Итоговый баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", BALANCE_RESULT_HEADER],
         ["Alice", "100.00", "50.00", "50.00"],
     ]
 
@@ -49,7 +50,7 @@ def test_participant_share_chart_has_user_facing_title():
     assert chart_display_title("spending_by_category.png") == "Расходы по категориям"
     assert chart_display_title("spending_by_payer.png") == "Расходы по плательщикам"
     assert chart_display_title("top_purchases.png") == "Крупнейшие покупки"
-    assert chart_display_title("balances.png") == "Итоговые балансы"
+    assert chart_display_title("balances.png") == "Кто должен и кому должны"
     assert chart_display_title("period_trend.png") == "Динамика расходов за период"
 
 

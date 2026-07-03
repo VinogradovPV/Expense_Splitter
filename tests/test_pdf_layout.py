@@ -73,6 +73,7 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
         encoding="utf-8-sig",
     )
     (charts_dir / "balances.png").write_bytes(b"fake")
+    (charts_dir / "period_trend.png").write_bytes(b"stale")
 
     report_pdf.write_pdf_report(
         tmp_path / "report.pdf",
@@ -81,6 +82,7 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
         tables_dir=tables_dir,
         table_specs=[PdfTableSpec("balances.csv", "Балансы")],
         charts_dir=charts_dir,
+        chart_paths=[charts_dir / "balances.png"],
     )
 
     story = captured["doc"].story
@@ -89,4 +91,8 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
     table_block = keep_blocks[0][1]
     assert ("paragraph", "Балансы", "h2") in table_block
     assert any(item == ("paragraph", BALANCE_EXPLANATION, "body") for item in table_block)
+    chart_block = keep_blocks[1][1]
+    assert chart_block[0] == ("paragraph", "Графики", "h2")
+    assert chart_block[1] == ("image", charts_dir / "balances.png")
+    assert ("image", charts_dir / "period_trend.png") not in chart_block
     assert "PAGEBREAK" not in story

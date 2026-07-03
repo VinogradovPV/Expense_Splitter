@@ -56,6 +56,12 @@ def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
     assert metadata["period"]["id"] == "2026-06"
     assert metadata["summary"]["total_amount"] == "120.50"
     assert metadata["palette"]["name"] == "expense_splitter_default"
+    assert "period_trend" not in metadata["charts_generated"]
+    assert {
+        "chart": "period_trend",
+        "reason": "chart_not_enough_data",
+        "message": "Недостаточно дат для построения динамики расходов.",
+    } in metadata["charts_skipped"]
 
 
 def test_csv_is_utf8_sig_with_russian_headers_and_decimal_strings(tmp_path):
@@ -86,7 +92,8 @@ def test_markdown_only_does_not_create_csv_or_png(tmp_path):
     assert "Обед" in text
     assert "Доля оплат, %" in text
     assert "Объем расходов на человека" in text
-    assert "Итоговый баланс" in text
+    assert "Итог: + получит, − должен" in text
+    assert "Итоговый баланс" not in text
     assert "Положительный итоговый баланс означает" in text
     assert not (report_dir / "tables").exists()
     assert not (report_dir / "charts").exists()
@@ -107,3 +114,22 @@ def test_all_report_documents_missing_charts_for_empty_period(tmp_path):
     assert warnings.count("chart_no_data") == 6
     metadata = json.loads((report_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["warning_count"] == 6
+
+
+def test_report_uses_current_chart_manifest_and_removes_stale_period_trend(tmp_path):
+    stale_chart_dir = tmp_path / "2026" / "2026-06" / "charts"
+    stale_chart_dir.mkdir(parents=True)
+    (stale_chart_dir / "period_trend.png").write_bytes(b"stale")
+
+    report_dir = generate_analytics_report(sample_dataset(), tmp_path, "all")
+
+    assert not (report_dir / "charts" / "period_trend.png").exists()
+    markdown = (report_dir / "analytics_report.md").read_text(encoding="utf-8")
+    html = (report_dir / "analytics_dashboard.html").read_text(encoding="utf-8")
+    metadata = json.loads((report_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    assert "Динамика расходов за период" not in markdown
+    assert "period_trend" not in markdown
+    assert "period_trend.png" not in html
+    assert "period_trend" not in metadata["charts_generated"]
+    assert "charts/period_trend.png" not in metadata["files"]

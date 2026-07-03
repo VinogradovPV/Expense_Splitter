@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 from expense_splitter.reports.output_adapters import (
@@ -110,6 +111,33 @@ def test_all_format_includes_internal_files_for_desktop_bundle(tmp_path):
         "report.xlsx",
         "summary.csv",
     }
+
+
+def test_output_adapter_uses_metadata_file_manifest_when_available(tmp_path):
+    report_dir = tmp_path / "reports" / "analytics" / "2026-07"
+    pdf_path, _, _ = write_report_files(report_dir)
+    stale_chart = report_dir / "charts" / "period_trend.png"
+    stale_chart.parent.mkdir()
+    stale_chart.write_bytes(b"stale")
+    (report_dir / "metadata.json").write_text(
+        json.dumps({"files": ["report.pdf", "metadata.json"]}),
+        encoding="utf-8",
+    )
+    adapter = LocalReportOutputAdapter()
+
+    result = adapter.build_result(
+        tenant_id="local",
+        report_type="analytics",
+        report_id="2026-07",
+        formats={"all"},
+        report_dir=report_dir,
+        created_at=datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc),
+        telegram_caption="caption",
+        warnings=[],
+        metadata={},
+    )
+
+    assert {file.filename for file in result.files} == {pdf_path.name, "metadata.json"}
 
 
 def test_pdf_font_healthcheck_is_structured():

@@ -1,7 +1,9 @@
+import json
 from datetime import date, datetime
 from decimal import Decimal
 
-from expense_splitter.analytics import parse_period
+from expense_splitter.analytics import build_analytics_dataset, parse_period
+from expense_splitter.analytics_reporting import generate_analytics_report
 from expense_splitter.models import Participant, Purchase, Settlement, SettlementPeriod
 from expense_splitter.reports.output_adapters import (
     ObjectStorageReportOutputAdapter,
@@ -28,6 +30,34 @@ def make_repository(tmp_path) -> YamlExpenseRepository:
             category="food",
         ),
     )
+    return repository
+
+
+def make_single_day_analytics_repository(tmp_path) -> YamlExpenseRepository:
+    data_dir = tmp_path / "data"
+    initialize_data_files(data_dir, [Participant("Alice"), Participant("Bob")], [])
+    repository = YamlExpenseRepository(data_dir)
+    for purchase in (
+        Purchase(
+            id="p1",
+            date=date(2026, 7, 3),
+            amount=Decimal("619.00"),
+            payer="Alice",
+            participants=["Alice", "Bob"],
+            purchase_name="Hotel",
+            category="travel",
+        ),
+        Purchase(
+            id="p2",
+            date=date(2026, 7, 3),
+            amount=Decimal("550.00"),
+            payer="Bob",
+            participants=["Alice", "Bob"],
+            purchase_name="Dinner",
+            category="food",
+        ),
+    ):
+        repository.add_purchase(LOCAL_TENANT_ID, purchase)
     return repository
 
 
@@ -65,6 +95,46 @@ def test_report_service_builds_analytics_report_result(tmp_path):
     assert result.report_id == "2026-07"
     assert result.formats == {"markdown"}
     assert any(file.filename == "analytics_report.md" for file in result.files)
+
+
+def test_report_service_skips_single_day_period_trend_and_ignores_stale_png(tmp_path):
+    repository = make_single_day_analytics_repository(tmp_path)
+    service = ReportService(repository, repository, repository)
+    stale_chart_dir = tmp_path / "reports" / "analytics" / "2026" / "2026-07" / "charts"
+    stale_chart_dir.mkdir(parents=True)
+    (stale_chart_dir / "period_trend.png").write_bytes(b"stale")
+
+    period_spec = parse_period("month", 2026, month=7)
+    local_dataset = build_analytics_dataset(
+        repository.list_participants(LOCAL_TENANT_ID),
+        [],
+        repository.list_purchases(LOCAL_TENANT_ID),
+        period_spec,
+    )
+    local_report_dir = generate_analytics_report(
+        local_dataset,
+        tmp_path / "local_reports" / "analytics",
+        "png",
+    )
+
+    result = service.build_analytics_report(
+        LOCAL_TENANT_ID,
+        period_spec,
+        formats={"png"},
+        output_root=tmp_path / "reports" / "analytics",
+    )
+
+    local_metadata = json.loads((local_report_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert not (local_report_dir / "charts" / "period_trend.png").exists()
+    assert "period_trend" not in local_metadata["charts_generated"]
+    assert any(
+        item["reason"] == "chart_not_enough_data"
+        for item in local_metadata["charts_skipped"]
+    )
+    assert any(warning["warning_type"] == "chart_not_enough_data" for warning in result.warnings)
+    assert "period_trend" not in result.metadata["charts_generated"]
+    assert not any(file.filename == "period_trend.png" for file in result.files)
+    assert not (stale_chart_dir / "period_trend.png").exists()
 
 
 def test_report_service_builds_settlement_period_report_result(tmp_path):

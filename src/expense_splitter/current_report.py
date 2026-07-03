@@ -37,7 +37,10 @@ from expense_splitter.models import (
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.report_tables import (
+    BALANCE_CHART_TITLE,
+    BALANCE_CHART_XLABEL,
     BALANCE_EXPLANATION,
+    BALANCE_RESULT_HEADER,
     chart_display_title,
     rows_for_visual_table,
     visual_table_note,
@@ -78,7 +81,7 @@ CHART_SPECS = (
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
     ("participant_share.png", chart_display_title("participant_share.png")),
-    ("balances.png", "Итоговые балансы"),
+    ("balances.png", chart_display_title("balances.png")),
     ("top_purchases.png", "Крупнейшие покупки"),
 )
 
@@ -417,7 +420,7 @@ def write_current_markdown(
     _append_markdown_table(
         lines,
         "Балансы",
-        ["Участник", "Оплачено", "Объем расходов на человека", "Итоговый баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", BALANCE_RESULT_HEADER],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
     )
     lines.extend([BALANCE_EXPLANATION, ""])
@@ -892,6 +895,7 @@ def _save_barh(
     xlabel: str,
     *,
     non_negative_x_axis: bool = False,
+    value_label_colors: list[str] | None = None,
 ) -> None:
     height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
     fig, ax = plt.subplots(figsize=(10, height))
@@ -906,7 +910,15 @@ def _save_barh(
         set_non_negative_x_axis(ax, values)
     else:
         _pad_axis(ax, values)
-    ax.bar_label(bars, labels=[_format_money(value) for value in values], padding=4, fontsize=9)
+    value_labels = ax.bar_label(
+        bars,
+        labels=[_format_money(value) for value in values],
+        padding=6,
+        fontsize=9,
+    )
+    if value_label_colors is not None:
+        for label, color in zip(value_labels, value_label_colors):
+            label.set_color(color)
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -916,7 +928,7 @@ def _pad_axis(ax, values: Sequence[float]) -> None:
     low = min(0.0, min(values))
     high = max(0.0, max(values))
     span = high - low or max(abs(high), abs(low), 1.0)
-    pad = span * 0.18
+    pad = span * 0.24
     ax.set_xlim(low - pad, high + pad)
 
 
@@ -979,13 +991,15 @@ def _chart_participant_share(dataset: CurrentReportDataset, path: Path) -> None:
 
 def _chart_balances(dataset: CurrentReportDataset, path: Path) -> None:
     rows = sorted(dataset.balances, key=lambda row: row.net)
+    colors = [color_for_balance_status(row.net) for row in rows]
     _save_barh(
         path,
         [row.participant for row in rows],
         [float(row.net) for row in rows],
-        [color_for_balance_status(row.net) for row in rows],
-        "Итоговые балансы",
-        "Итоговый баланс",
+        colors,
+        BALANCE_CHART_TITLE,
+        BALANCE_CHART_XLABEL,
+        value_label_colors=colors,
     )
 
 
@@ -1097,7 +1111,7 @@ def _is_money(header: str, row: list[str]) -> bool:
         "Доля",
         "Баланс",
         "Объем расходов на человека",
-        "Итоговый баланс",
+        BALANCE_RESULT_HEADER,
         "Доля, %",
         "Доля оплат, %",
     }

@@ -234,14 +234,16 @@ def test_settlement_period_report_files_are_readable(tmp_path):
     assert "# Отчет по периоду взаиморасчетов" in markdown
     assert "Доля оплат, %" in markdown
     assert "Объем расходов на человека" in markdown
-    assert "Итоговый баланс" in markdown
+    assert "Итог: + получит, − должен" in markdown
+    assert "Итоговый баланс" not in markdown
     assert "Положительный итоговый баланс означает" in markdown
     html = (report_dir / "settlement_period_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="utf-8">' in html
     assert "Отчет по периоду взаиморасчетов" in html
     assert "Доля оплат, %" in html
     assert "Объем расходов на человека" in html
-    assert "Итоговый баланс" in html
+    assert "Итог: + получит, − должен" in html
+    assert "Итоговый баланс" not in html
     assert "Положительный итоговый баланс означает" in html
     assert "payer_total" not in html
     assert "payer_rank" not in html
@@ -279,7 +281,8 @@ def test_settlement_period_report_files_are_readable(tmp_path):
     assert "Доля" not in balance_headers
     assert "Баланс" not in balance_headers
     assert "Объем расходов на человека" in balance_headers
-    assert "Итоговый баланс" in balance_headers
+    assert "Итоговый баланс" not in balance_headers
+    assert "Итог: + получит, − должен" in balance_headers
 
 
 def test_empty_period_does_not_fail_and_writes_warning(tmp_path):
