@@ -72,6 +72,13 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
         "Участник,Оплачено,Доля,Баланс\nAlice,100.00,50.00,50.00\n",
         encoding="utf-8-sig",
     )
+    (tables_dir / "warnings.csv").write_text(
+        (
+            "Тип предупреждения,ID покупки,Наименование покупки,Сообщение\n"
+            "chart_not_enough_data,,,Недостаточно дат для построения динамики расходов.\n"
+        ),
+        encoding="utf-8-sig",
+    )
     (charts_dir / "balances.png").write_bytes(b"fake")
     (charts_dir / "period_trend.png").write_bytes(b"stale")
 
@@ -80,7 +87,10 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
         title="Smoke",
         metadata_rows=[["Показатель", "Значение"]],
         tables_dir=tables_dir,
-        table_specs=[PdfTableSpec("balances.csv", "Балансы")],
+        table_specs=[
+            PdfTableSpec("balances.csv", "Балансы"),
+            PdfTableSpec("warnings.csv", "Предупреждения"),
+        ],
         charts_dir=charts_dir,
         chart_paths=[charts_dir / "balances.png"],
     )
@@ -91,7 +101,22 @@ def test_pdf_story_keeps_table_title_with_table_and_avoids_chart_pagebreak(
     table_block = keep_blocks[0][1]
     assert ("paragraph", "Балансы", "h2") in table_block
     assert any(item == ("paragraph", BALANCE_EXPLANATION, "body") for item in table_block)
-    chart_block = keep_blocks[1][1]
+    warnings_block = keep_blocks[1][1]
+    assert ("paragraph", "Предупреждения", "h2") in warnings_block
+    assert (
+        "table",
+        [
+            ["Тип предупреждения", "ID покупки", "Наименование покупки", "Сообщение"],
+            [
+                "chart_not_enough_data",
+                "",
+                "",
+                "Недостаточно дат для построения динамики расходов.",
+            ],
+        ],
+    ) in warnings_block
+    assert ("table", [["Предупреждений нет."]]) not in warnings_block
+    chart_block = keep_blocks[2][1]
     assert chart_block[0] == ("paragraph", "Графики", "h2")
     assert chart_block[1] == ("image", charts_dir / "balances.png")
     assert ("image", charts_dir / "period_trend.png") not in chart_block

@@ -1343,6 +1343,7 @@ install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`
 | Chart axes | Расходные графики получают X scale from zero с правым запасом; balance chart сохраняет отрицательную область |
 | Period trend | Если дат меньше двух, `period_trend` не строится и выводится понятное предупреждение |
 | Period trend policy | `period_trend` использует дневную агрегацию, единое правило skip/build и manifest текущего запуска для PDF/ReportService |
+| Skipped trend warning | Local/GUI/CLI и ReportService показывают `Недостаточно дат для построения динамики расходов.` при пропуске `period_trend` |
 | Stale PNG protection | Аналитический отчет очищает известные chart-файлы перед генерацией и не включает старые PNG в `ReportResult.files` |
 | Warnings | Пустой visual-раздел предупреждений показывает `Предупреждений нет.` |
 | Analytics summary | Raw period values `month/quarter/year` заменены пользовательскими русскими подписями в visual summary |

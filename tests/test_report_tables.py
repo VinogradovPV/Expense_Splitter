@@ -45,6 +45,15 @@ def test_empty_warnings_visual_rows_show_message():
     ]
 
 
+def test_non_empty_warnings_visual_rows_keep_warning_message():
+    rows = [
+        ["Тип предупреждения", "ID покупки", "Наименование покупки", "Сообщение"],
+        ["chart_not_enough_data", "", "", "Недостаточно дат для построения динамики расходов."],
+    ]
+
+    assert rows_for_visual_table("warnings.csv", rows) == rows
+
+
 def test_participant_share_chart_has_user_facing_title():
     assert chart_display_title("participant_share.png") == "Объем расходов на человека"
     assert chart_display_title("spending_by_category.png") == "Расходы по категориям"

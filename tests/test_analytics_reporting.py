@@ -29,6 +29,65 @@ def sample_dataset():
     )
 
 
+def dataset_with_purchases(purchases):
+    return build_analytics_dataset(
+        [Participant("Алиса"), Participant("Боб")],
+        [],
+        purchases,
+        parse_period("month", 2026, month=7),
+    )
+
+
+def one_date_dataset():
+    return dataset_with_purchases(
+        [
+            Purchase(
+                id="p1",
+                date=date(2026, 7, 1),
+                amount=Decimal("619.00"),
+                payer="Алиса",
+                participants=["Алиса", "Боб"],
+                purchase_name="Отель",
+                category="Поездка",
+            ),
+            Purchase(
+                id="p2",
+                date=date(2026, 7, 1),
+                amount=Decimal("550.00"),
+                payer="Боб",
+                participants=["Алиса", "Боб"],
+                purchase_name="Ужин",
+                category="Еда",
+            ),
+        ]
+    )
+
+
+def two_date_dataset():
+    return dataset_with_purchases(
+        [
+            Purchase(
+                id="p1",
+                date=date(2026, 7, 1),
+                amount=Decimal("619.00"),
+                payer="Алиса",
+                participants=["Алиса", "Боб"],
+                purchase_name="Отель",
+                category="Поездка",
+            ),
+            Purchase(
+                id="p2",
+                date=date(2026, 7, 2),
+                amount=Decimal("550.00"),
+                payer="Боб",
+                participants=["Алиса", "Боб"],
+                purchase_name="Ужин",
+                category="Еда",
+            ),
+        ]
+    )
+
+
 def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
     report_dir = generate_analytics_report(sample_dataset(), tmp_path, "all")
 
@@ -133,3 +192,40 @@ def test_report_uses_current_chart_manifest_and_removes_stale_period_trend(tmp_p
     assert "period_trend.png" not in html
     assert "period_trend" not in metadata["charts_generated"]
     assert "charts/period_trend.png" not in metadata["files"]
+
+
+def test_one_date_report_shows_skipped_period_trend_warning_everywhere(tmp_path):
+    report_dir = generate_analytics_report(one_date_dataset(), tmp_path, "all")
+
+    warnings_csv = (report_dir / "tables" / "warnings.csv").read_text(encoding="utf-8-sig")
+    markdown = (report_dir / "analytics_report.md").read_text(encoding="utf-8")
+    html = (report_dir / "analytics_dashboard.html").read_text(encoding="utf-8")
+    metadata = json.loads((report_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["summary"]["total_amount"] == "1169.00"
+    assert not (report_dir / "charts" / "period_trend.png").exists()
+    assert warnings_csv.count("chart_not_enough_data") == 1
+    assert "Недостаточно дат для построения динамики расходов." in warnings_csv
+    assert markdown.count("Недостаточно дат для построения динамики расходов.") == 1
+    assert "Предупреждений нет." not in markdown
+    assert html.count("Недостаточно дат для построения динамики расходов.") == 1
+    assert "Предупреждений нет." not in html
+    assert [row["warning_type"] for row in metadata["warnings"]].count(
+        "chart_not_enough_data"
+    ) == 1
+    assert "period_trend" not in metadata["charts_generated"]
+
+
+def test_two_date_report_builds_period_trend_without_not_enough_data_warning(tmp_path):
+    report_dir = generate_analytics_report(two_date_dataset(), tmp_path, "all")
+
+    warnings_csv = (report_dir / "tables" / "warnings.csv").read_text(encoding="utf-8-sig")
+    metadata = json.loads((report_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    assert (report_dir / "charts" / "period_trend.png").is_file()
+    assert "period_trend" in metadata["charts_generated"]
+    assert "chart_not_enough_data" not in warnings_csv
+    assert not any(
+        warning["warning_type"] == "chart_not_enough_data"
+        for warning in metadata["warnings"]
+    )

@@ -25,6 +25,7 @@ TABLES = (
     ("top_purchases.csv", "Крупнейшие покупки"),
     ("warnings.csv", "Предупреждения"),
 )
+DISPLAY_TABLES = tuple(item for item in TABLES if item[0] != "warnings.csv")
 
 CHARTS = (
     ("spending_by_category.png", "Расходы по категориям"),
@@ -86,7 +87,9 @@ def write_html_report(
         f"<strong>{escape(value)}</strong></div>"
         for label, value in cards
     )
-    table_html = "".join(_table_section(path.parent, filename, title) for filename, title in TABLES)
+    table_html = "".join(
+        _table_section(path.parent, filename, title) for filename, title in DISPLAY_TABLES
+    )
     generated_chart_names = {chart_path.name for chart_path in chart_paths}
     chart_html = "".join(
         _chart_section(path.parent, filename, title)

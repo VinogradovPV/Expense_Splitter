@@ -120,7 +120,9 @@ reports/analytics/<year>/<period-id>/
 покупок в один день агрегируются в дневную сумму, например `619.00 + 550.00 = 1169.00`. Если
 уникальная дата одна, график динамики пропускается, в warnings добавляется
 `chart_not_enough_data`, а `period_trend` не попадает в `metadata.files`, `charts_generated`, PDF,
-HTML, XLSX и delivery result.
+HTML, XLSX и delivery result. Local CLI, GUI и ReportService используют один и тот же chart policy:
+пользователь видит предупреждение `Недостаточно дат для построения динамики расходов.`, а не
+сообщение `Предупреждений нет.`.
 
 В таблице `Расходы по плательщикам` для analytics, current-report и settlement-period report есть
 колонка `Доля оплат, %`. Она показывает `оплачено плательщиком / общая сумма отчета * 100`, с
