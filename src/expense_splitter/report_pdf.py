@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Sequence
 
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import rows_for_visual_table, visual_table_note
 
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
@@ -67,7 +67,7 @@ def _load_reportlab_layout_tools() -> dict[str, Any]:
     from reportlab.lib.units import cm
     from reportlab.platypus import (
         Image,
-        PageBreak,
+        KeepTogether,
         Paragraph,
         SimpleDocTemplate,
         Spacer,
@@ -78,7 +78,7 @@ def _load_reportlab_layout_tools() -> dict[str, Any]:
     return {
         "A4": A4,
         "Image": Image,
-        "PageBreak": PageBreak,
+        "KeepTogether": KeepTogether,
         "Paragraph": Paragraph,
         "ParagraphStyle": ParagraphStyle,
         "SimpleDocTemplate": SimpleDocTemplate,
@@ -123,20 +123,19 @@ def write_pdf_report(
 
     for spec in table_specs:
         csv_path = tables_dir / spec.filename
-        story.append(tools["Paragraph"](spec.title, styles["Heading2"]))
         if csv_path.is_file():
             rows = rows_for_visual_table(spec.filename, _read_csv(csv_path))
-            story.append(_build_table(rows, styles, doc.width, compact=True, tools=tools))
+            story.extend(_table_section(spec.title, spec.filename, rows, styles, doc.width, tools))
         else:
-            story.append(tools["Paragraph"]("Таблица не создана.", styles["BodyText"]))
+            story.extend(
+                _message_section(spec.title, "Таблица не создана.", styles, tools)
+            )
         story.append(tools["Spacer"](1, 0.35 * tools["cm"]))
 
     chart_paths = sorted(charts_dir.glob("*.png")) if charts_dir and charts_dir.exists() else []
     if chart_paths:
-        story.append(tools["PageBreak"]())
         story.append(tools["Paragraph"]("Графики", styles["Heading2"]))
         for chart_path in chart_paths:
-            story.append(tools["Paragraph"](chart_display_title(chart_path), styles["Heading3"]))
             story.append(_image(chart_path, doc.width, doc.height * 0.72, tools))
             story.append(tools["Spacer"](1, 0.25 * tools["cm"]))
 
@@ -178,6 +177,45 @@ def _styles(font_name: str, tools: dict[str, Any]):
         )
     )
     return styles
+
+
+def _table_section(
+    title: str,
+    filename: str,
+    rows: Sequence[Sequence[object]],
+    styles,
+    width: float,
+    tools: dict[str, Any],
+) -> list[object]:
+    content: list[object] = [
+        tools["Paragraph"](title, styles["Heading2"]),
+        _build_table(rows, styles, width, compact=True, tools=tools),
+    ]
+    note = visual_table_note(filename)
+    if note:
+        content.extend(
+            [
+                tools["Spacer"](1, 0.08 * tools["cm"]),
+                tools["Paragraph"](note, styles["BodyText"]),
+            ]
+        )
+    return [tools["KeepTogether"](content)]
+
+
+def _message_section(
+    title: str,
+    message: str,
+    styles,
+    tools: dict[str, Any],
+) -> list[object]:
+    return [
+        tools["KeepTogether"](
+            [
+                tools["Paragraph"](title, styles["Heading2"]),
+                tools["Paragraph"](message, styles["BodyText"]),
+            ]
+        )
+    ]
 
 
 def _build_table(

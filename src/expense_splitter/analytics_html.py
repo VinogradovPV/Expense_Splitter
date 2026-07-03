@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Sequence
 
 from expense_splitter.analytics import AnalyticsDataset
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    chart_display_title,
+    rows_for_visual_table,
+    visual_table_note,
+)
 
 TABLES = (
     ("summary.csv", "Сводка"),
@@ -131,6 +135,9 @@ def _table_section(report_dir: Path, filename: str, title: str) -> str:
             for row in rows[1:]
         )
         body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
+    note = visual_table_note(filename)
+    if note:
+        body += f'<p class="muted">{escape(note)}</p>'
     return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
 
 

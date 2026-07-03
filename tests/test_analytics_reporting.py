@@ -49,7 +49,8 @@ def test_all_report_creates_markdown_csv_png_and_metadata(tmp_path):
         "top_purchases.csv",
         "warnings.csv",
     }
-    assert len(list((report_dir / "charts").glob("*.png"))) == 6
+    assert len(list((report_dir / "charts").glob("*.png"))) == 5
+    assert not (report_dir / "charts" / "period_trend.png").exists()
 
     metadata = json.loads((report_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["period"]["id"] == "2026-06"
@@ -84,6 +85,9 @@ def test_markdown_only_does_not_create_csv_or_png(tmp_path):
     assert "# Аналитика расходов: 2026-06" in text
     assert "Обед" in text
     assert "Доля оплат, %" in text
+    assert "Объем расходов на человека" in text
+    assert "Итоговый баланс" in text
+    assert "Положительный итоговый баланс означает" in text
     assert not (report_dir / "tables").exists()
     assert not (report_dir / "charts").exists()
 

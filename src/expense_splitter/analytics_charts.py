@@ -51,6 +51,16 @@ def generate_analytics_charts(
         if not dataset.purchases or not rows:
             warnings.append(_chart_warning(filename))
             continue
+        if filename == "period_trend.png" and len(_period_trend_points(dataset)[0]) < 2:
+            warnings.append(
+                {
+                    "warning_type": "chart_not_enough_data",
+                    "purchase_id": "",
+                    "purchase_name": "",
+                    "message": "Недостаточно дат для построения динамики расходов.",
+                }
+            )
+            continue
         path = output_dir / filename
         renderer(dataset, path)
         generated.append(path)
@@ -63,12 +73,22 @@ def _chart_warning(filename: str) -> dict[str, object]:
         "warning_type": "chart_no_data",
         "purchase_id": "",
         "purchase_name": "",
-        "message": f"График {filename} не создан: за выбранный период нет данных.",
+        "message": (
+            f"График «{chart_display_title(filename)}» не создан: "
+            "за выбранный период нет данных."
+        ),
     }
 
 
 def _save_barh(
-    path: Path, labels: list[str], values: list[float], colors: list[str], title: str, xlabel: str
+    path: Path,
+    labels: list[str],
+    values: list[float],
+    colors: list[str],
+    title: str,
+    xlabel: str,
+    *,
+    non_negative_x_axis: bool = False,
 ) -> None:
     height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
     fig, ax = plt.subplots(figsize=(10, height))
@@ -79,7 +99,10 @@ def _save_barh(
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.grid(axis="x", alpha=0.2)
-    _pad_value_axis(ax, values)
+    if non_negative_x_axis:
+        set_non_negative_x_axis(ax, values)
+    else:
+        _pad_value_axis(ax, values)
     ax.bar_label(
         bars,
         labels=[_format_chart_value(value) for value in values],
@@ -101,6 +124,17 @@ def _pad_value_axis(ax, values: list[float]) -> None:
     ax.set_xlim(low - pad, high + pad)
 
 
+def set_non_negative_x_axis(ax, values: list[float]) -> None:
+    if not values:
+        return
+    if any(value < 0 for value in values):
+        _pad_value_axis(ax, values)
+        return
+    high = max(values)
+    right = high * 1.18 if high > 0 else 1.0
+    ax.set_xlim(left=0, right=right)
+
+
 def _format_chart_value(value: float) -> str:
     return f"{value:,.2f}".replace(",", " ")
 
@@ -115,6 +149,7 @@ def _spending_by_category(dataset: AnalyticsDataset, path: Path) -> None:
         [color_map[label] for label in labels],
         "Расходы по категориям",
         "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -127,7 +162,8 @@ def _spending_by_payer(dataset: AnalyticsDataset, path: Path) -> None:
         [float(row["total_paid"]) for row in dataset.by_payer],
         [color_map[label] for label in labels],
         "Расходы по плательщикам",
-        "Оплачено",
+        "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -140,7 +176,8 @@ def _participant_share(dataset: AnalyticsDataset, path: Path) -> None:
         [float(row["total_share"]) for row in dataset.by_participant],
         [color_map[label] for label in labels],
         chart_display_title("participant_share.png"),
-        "Доля расходов",
+        "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -153,11 +190,11 @@ def _balances(dataset: AnalyticsDataset, path: Path) -> None:
         [float(row.net) for row in rows],
         [color_for_balance_status(row.net) for row in rows],
         "Итоговые балансы",
-        "Баланс",
+        "Итоговый баланс",
     )
 
 
-def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
+def _period_trend_points(dataset: AnalyticsDataset) -> tuple[list[str], list[float]]:
     totals: dict[str, float] = defaultdict(float)
     for purchase in dataset.purchases:
         if purchase.date is None:
@@ -170,7 +207,11 @@ def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
         totals[key] += float(purchase.amount)
 
     labels = sorted(totals)
-    values = [totals[label] for label in labels]
+    return labels, [totals[label] for label in labels]
+
+
+def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
+    labels, values = _period_trend_points(dataset)
     period_colors = build_period_color_map(labels)
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(labels, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
@@ -208,4 +249,5 @@ def _top_purchases(dataset: AnalyticsDataset, path: Path) -> None:
         colors,
         "Крупнейшие покупки",
         "Сумма",
+        non_negative_x_axis=True,
     )

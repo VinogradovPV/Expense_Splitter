@@ -165,12 +165,17 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     assert "# Отчет по текущим взаиморасчетам" in markdown
     assert "Какие покупки включены: Открытые покупки" in markdown
     assert "Доля оплат, %" in markdown
+    assert "Объем расходов на человека" in markdown
+    assert "Итоговый баланс" in markdown
+    assert "Положительный итоговый баланс означает" in markdown
     assert markdown.index("## Итоговые переводы") < markdown.index("## Расходы по категориям")
     html = (report_dir / "current_state_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="UTF-8">' in html
     assert "Отчет по текущим взаиморасчетам" in html
     assert "Доля оплат, %" in html
     assert "Объем расходов на человека" in html
+    assert "Итоговый баланс" in html
+    assert "Положительный итоговый баланс означает" in html
     assert "payer_total" not in html
     assert "payer_rank" not in html
     assert html.index("Итоговые переводы") < html.index("Покупки")
@@ -200,6 +205,15 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     )
     payer_sheet = workbook["По плательщикам"]
     assert "Доля оплат, %" in [cell.value for cell in payer_sheet[3]]
+    participant_sheet = workbook["Объем расходов на человека"]
+    assert "Доля расходов" not in [cell.value for cell in participant_sheet[3]]
+    assert "Объем расходов на человека" in [cell.value for cell in participant_sheet[3]]
+    balances_sheet = workbook["Балансы участников"]
+    balance_headers = [cell.value for cell in balances_sheet[3]]
+    assert "Доля" not in balance_headers
+    assert "Баланс" not in balance_headers
+    assert "Объем расходов на человека" in balance_headers
+    assert "Итоговый баланс" in balance_headers
 
 
 def test_empty_open_scope_writes_metadata_summary_and_warning(tmp_path):

@@ -41,7 +41,11 @@ from expense_splitter.models import (
 )
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    BALANCE_EXPLANATION,
+    chart_display_title,
+    rows_for_visual_table,
+)
 from expense_splitter.settlement_periods import get_settlement_period
 from expense_splitter.ui_labels import (
     label_for_period_status,
@@ -383,7 +387,7 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Объем расходов на человека",
-        ["Участник", "Доля расходов", "Покупок"],
+        ["Участник", "Объем расходов на человека", "Покупок"],
         (
             [row["participant"], row["total_share"], row["purchase_count"]]
             for row in dataset.by_participant
@@ -392,9 +396,10 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Балансы",
-        ["Участник", "Оплачено", "Доля", "Баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", "Итоговый баланс"],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
     )
+    lines.extend([BALANCE_EXPLANATION, ""])
     _append_markdown_table(
         lines,
         "Итоговые переводы",
@@ -808,5 +813,5 @@ def _chart_warning(filename: str) -> dict[str, object]:
         "chart_no_data",
         "",
         "",
-        f"График {filename} не создан: нет данных для settlement period.",
+        f"График «{chart_display_title(filename)}» не создан: нет данных для settlement period.",
     )

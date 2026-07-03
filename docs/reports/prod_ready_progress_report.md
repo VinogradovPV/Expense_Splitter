@@ -1324,3 +1324,36 @@ outside-sandbox запуска проверок в текущем API-сеанс
 Не удалять, не пересоздавать и не публиковать tags/releases автоматически. Перед финальной
 release-процедурой нужно отдельное решение пользователя по существующему `v0.1.1`. Перед commit
 TG-PREP.1 нужно выполнить полный quality gate, потому что изменен `pyproject.toml`.
+
+## P2.RPT.5 — Улучшение PDF-отчетов, подписей и графиков
+
+Дата: 2026-07-03
+Статус: implemented locally on `cloud/telegram-prep`; full quality gate passed. Pytest and pip
+install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`/pip temp dirs.
+
+### Что исправлено
+
+| Область | Изменение |
+|---|---|
+| PDF layout | Табличные секции собираются через общий block builder с `KeepTogether`; заголовок таблицы удерживается вместе с таблицей |
+| PDF pages | Убран безусловный `PageBreak` перед графиками; пустые страницы считаются дефектом |
+| Visual labels | `by_participant` показывает `Объем расходов на человека`; `balances` показывает `Объем расходов на человека` и `Итоговый баланс` |
+| Balance explanation | PDF/HTML/Markdown добавляют пояснение знака итогового баланса |
+| Chart titles | Internal chart keys не выводятся пользователю; используются русские заголовки |
+| Chart axes | Расходные графики получают X scale from zero с правым запасом; balance chart сохраняет отрицательную область |
+| Period trend | Если дат меньше двух, `period_trend` не строится и выводится понятное предупреждение |
+| Warnings | Пустой visual-раздел предупреждений показывает `Предупреждений нет.` |
+| Analytics summary | Raw period values `month/quarter/year` заменены пользовательскими русскими подписями в visual summary |
+
+### Проверки
+
+- `python -m pip install -e ".[dev]"`: OK outside sandbox.
+- Focused PDF/report tests: 23 passed outside sandbox.
+- `python -m pytest tests -v`: 234 passed outside sandbox.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+
+Manual smoke generated analytics/current/settlement PDF files under `.tmp/p2_rpt5_smoke_20260703`.
+Poppler is not available in the local environment, so PNG rendering of PDF pages was not performed.

@@ -280,6 +280,12 @@ PDF is available for:
 Use `--format pdf` to create only PDF or `--format all` to include PDF with the existing
 Markdown, CSV, PNG, HTML and XLSX outputs.
 
+PDF reports keep table section headings with the table header and first data row, so a heading
+does not remain alone at the bottom of a page. Empty PDF pages are treated as a report defect.
+Visual report labels are user-facing Russian text: internal chart keys stay in filenames and
+metadata, expense charts start from zero, and the balance table explains the sign of the final
+balance.
+
 Purchase tables in all report formats use the same business sorting: payers are ordered by
 `payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by
 amount descending, date descending, purchase name ascending and id ascending. CSV purchases tables

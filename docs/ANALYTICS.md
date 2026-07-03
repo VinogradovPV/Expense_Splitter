@@ -80,6 +80,7 @@ expense-splitter settlement-period report settlement_2026_06_30_001 --format xls
 - `png` — статические графики;
 - `html` — offline dashboard с embedded CSS и локальными PNG;
 - `xlsx` — Excel-книга через `openpyxl`, без COM и установленного Excel;
+- `pdf` — нативный PDF через ReportLab;
 - `all` — все форматы и `metadata.json`.
 
 ## Структура output
@@ -148,6 +149,10 @@ expense-splitter analytics --period year --year 2026 --format pdf
 
 The file is saved as `reports/analytics/<year>/<period-id>/expense_analytics_<period-id>.pdf`.
 PDF is generated natively with ReportLab and local fonts; it is not browser print output.
+PDF layout keeps table headings together with the table header and first data row; empty pages are
+considered a defect. Chart sections use Russian user-facing titles, while internal chart keys remain
+only in filenames and metadata. Non-negative expense charts start their X scale at zero; the balance
+chart may use negative values and the balance table includes an explanation of the sign.
 
 The purchases table is sorted by payer total descending, then by purchase amount descending inside
 each payer. CSV adds `payer_total` and `payer_rank` so the grouping remains machine-readable.

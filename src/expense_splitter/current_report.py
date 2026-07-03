@@ -36,7 +36,12 @@ from expense_splitter.models import (
 )
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    BALANCE_EXPLANATION,
+    chart_display_title,
+    rows_for_visual_table,
+    visual_table_note,
+)
 from expense_splitter.settlement import calculate_settlements
 from expense_splitter.settlement_periods import filter_purchases_by_settlement_scope
 from expense_splitter.ui_labels import (
@@ -73,7 +78,7 @@ CHART_SPECS = (
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
     ("participant_share.png", chart_display_title("participant_share.png")),
-    ("balances.png", "Балансы"),
+    ("balances.png", "Итоговые балансы"),
     ("top_purchases.png", "Крупнейшие покупки"),
 )
 
@@ -403,7 +408,7 @@ def write_current_markdown(
     _append_markdown_table(
         lines,
         "Объем расходов на человека",
-        ["Участник", "Доля расходов", "Покупок"],
+        ["Участник", "Объем расходов на человека", "Покупок"],
         (
             [row["participant"], row["total_share"], row["purchase_count"]]
             for row in dataset.by_participant
@@ -412,9 +417,10 @@ def write_current_markdown(
     _append_markdown_table(
         lines,
         "Балансы",
-        ["Участник", "Оплачено", "Доля", "Баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", "Итоговый баланс"],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
     )
+    lines.extend([BALANCE_EXPLANATION, ""])
     _append_markdown_table(
         lines,
         "Покупки в текущем расчете",
@@ -805,7 +811,8 @@ def _append_markdown_table(
     output_headers = _headers_for_markdown(headers, serialized_rows)
     lines.extend([f"## {title}", ""])
     if not serialized_rows:
-        lines.extend(["Нет данных.", ""])
+        empty_message = "Предупреждений нет." if title == "Предупреждения" else "Нет данных."
+        lines.extend([empty_message, ""])
         return
     lines.append("| " + " | ".join(output_headers) + " |")
     lines.append("|" + "|".join("---" for _ in output_headers) + "|")
@@ -844,6 +851,9 @@ def _html_table(report_dir: Path, filename: str, title: str) -> str:
             for row in rows[1:]
         )
         body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
+    note = visual_table_note(filename)
+    if note:
+        body += f'<p class="muted">{escape(note)}</p>'
     return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
 
 
@@ -880,6 +890,8 @@ def _save_barh(
     colors: list[str],
     title: str,
     xlabel: str,
+    *,
+    non_negative_x_axis: bool = False,
 ) -> None:
     height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
     fig, ax = plt.subplots(figsize=(10, height))
@@ -890,7 +902,10 @@ def _save_barh(
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.grid(axis="x", alpha=0.2)
-    _pad_axis(ax, values)
+    if non_negative_x_axis:
+        set_non_negative_x_axis(ax, values)
+    else:
+        _pad_axis(ax, values)
     ax.bar_label(bars, labels=[_format_money(value) for value in values], padding=4, fontsize=9)
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -903,6 +918,17 @@ def _pad_axis(ax, values: Sequence[float]) -> None:
     span = high - low or max(abs(high), abs(low), 1.0)
     pad = span * 0.18
     ax.set_xlim(low - pad, high + pad)
+
+
+def set_non_negative_x_axis(ax, values: Sequence[float]) -> None:
+    if not values:
+        return
+    if any(value < 0 for value in values):
+        _pad_axis(ax, values)
+        return
+    high = max(values)
+    right = high * 1.18 if high > 0 else 1.0
+    ax.set_xlim(left=0, right=right)
 
 
 def _format_money(value: float) -> str:
@@ -919,6 +945,7 @@ def _chart_category(dataset: CurrentReportDataset, path: Path) -> None:
         [colors[label] for label in labels],
         "Расходы по категориям",
         "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -931,7 +958,8 @@ def _chart_payer(dataset: CurrentReportDataset, path: Path) -> None:
         [float(row["total_paid"]) for row in dataset.by_payer],
         [colors[label] for label in labels],
         "Расходы по плательщикам",
-        "Оплачено",
+        "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -944,7 +972,8 @@ def _chart_participant_share(dataset: CurrentReportDataset, path: Path) -> None:
         [float(row["total_share"]) for row in dataset.by_participant],
         [colors[label] for label in labels],
         chart_display_title("participant_share.png"),
-        "Доля расходов",
+        "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -955,8 +984,8 @@ def _chart_balances(dataset: CurrentReportDataset, path: Path) -> None:
         [row.participant for row in rows],
         [float(row.net) for row in rows],
         [color_for_balance_status(row.net) for row in rows],
-        "Балансы",
-        "Баланс",
+        "Итоговые балансы",
+        "Итоговый баланс",
     )
 
 
@@ -969,6 +998,7 @@ def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
         [QUALITATIVE_PALETTE[(int(row["rank"]) - 1) % len(QUALITATIVE_PALETTE)] for row in rows],
         "Крупнейшие покупки",
         "Сумма",
+        non_negative_x_axis=True,
     )
 
 
@@ -977,7 +1007,10 @@ def _chart_warning(filename: str) -> dict[str, object]:
         "warning_type": "chart_no_data",
         "purchase_id": "",
         "purchase_name": "",
-        "message": f"График {filename} не создан: нет данных для текущего режима расчета.",
+        "message": (
+            f"График «{chart_display_title(filename)}» не создан: "
+            "нет данных для текущего режима расчета."
+        ),
     }
 
 
@@ -1063,6 +1096,8 @@ def _is_money(header: str, row: list[str]) -> bool:
         "Доля расходов",
         "Доля",
         "Баланс",
+        "Объем расходов на человека",
+        "Итоговый баланс",
         "Доля, %",
         "Доля оплат, %",
     }
