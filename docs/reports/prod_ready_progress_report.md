@@ -1344,6 +1344,7 @@ install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`
 | Period trend | Если дат меньше двух, `period_trend` не строится и выводится понятное предупреждение |
 | Period trend policy | `period_trend` использует дневную агрегацию, единое правило skip/build и manifest текущего запуска для PDF/ReportService |
 | Skipped trend warning | Local/GUI/CLI и ReportService показывают `Недостаточно дат для построения динамики расходов.` при пропуске `period_trend` |
+| Current operations chart | Current-report строит `Операции по дням` при минимум двух уникальных датах и агрегирует несколько покупок одного дня |
 | Stale PNG protection | Аналитический отчет очищает известные chart-файлы перед генерацией и не включает старые PNG в `ReportResult.files` |
 | Warnings | Пустой visual-раздел предупреждений показывает `Предупреждений нет.` |
 | Analytics summary | Raw period values `month/quarter/year` заменены пользовательскими русскими подписями в visual summary |

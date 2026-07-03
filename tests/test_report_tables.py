@@ -60,6 +60,7 @@ def test_participant_share_chart_has_user_facing_title():
     assert chart_display_title("spending_by_payer.png") == "Расходы по плательщикам"
     assert chart_display_title("top_purchases.png") == "Крупнейшие покупки"
     assert chart_display_title("balances.png") == "Кто должен и кому должны"
+    assert chart_display_title("operations_by_day.png") == "Операции по дням"
     assert chart_display_title("period_trend.png") == "Динамика расходов за период"
 
 

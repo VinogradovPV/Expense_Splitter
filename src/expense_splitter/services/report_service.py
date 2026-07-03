@@ -62,6 +62,7 @@ class ReportService:
             output_root=self.output_adapter.output_root(output_root, "current"),
             output_format=_single_generator_format(requested_formats),
         )
+        warnings = _generated_warnings(report_dir, dataset.warnings)
         return self.output_adapter.build_result(
             tenant_id=tenant_id,
             report_type="current",
@@ -70,7 +71,7 @@ class ReportService:
             report_dir=report_dir,
             created_at=created_at,
             telegram_caption=f"Отчет по текущим взаиморасчетам: {scope}",
-            warnings=list(dataset.warnings),
+            warnings=warnings,
             metadata={"scope": scope, "source": "repository_protocol"},
         )
 

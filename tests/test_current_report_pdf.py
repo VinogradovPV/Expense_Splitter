@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 import expense_splitter.current_report as current_report
 import expense_splitter.report_pdf as report_pdf
 from expense_splitter.current_report import build_current_report_dataset, generate_current_report
+from expense_splitter.models import Purchase
 from expense_splitter.report_pdf import PdfTableSpec, discover_cyrillic_font
 from tests.test_current_report import sample_participants, sample_purchases
 
@@ -57,6 +60,51 @@ def test_current_report_pdf_tables_start_with_settlements_without_duplicate_summ
     table_filenames = [spec.filename for spec in captured["table_specs"]]
     assert table_filenames[0] == "settlements.csv"
     assert "summary.csv" not in table_filenames
+
+
+def test_current_report_pdf_receives_operations_by_day_chart_manifest(tmp_path, monkeypatch):
+    purchases = [
+        Purchase(
+            id="p1",
+            date=date(2026, 7, 1),
+            amount=Decimal("619.00"),
+            payer="Alice",
+            participants=["Alice", "Bob"],
+            purchase_name="Hotel",
+            category="Travel",
+        ),
+        Purchase(
+            id="p2",
+            date=date(2026, 7, 1),
+            amount=Decimal("550.00"),
+            payer="Bob",
+            participants=["Alice", "Bob"],
+            purchase_name="Dinner",
+            category="Food",
+        ),
+        Purchase(
+            id="p3",
+            date=date(2026, 7, 3),
+            amount=Decimal("90.00"),
+            payer="Alice",
+            participants=["Alice", "Bob"],
+            purchase_name="Taxi",
+            category="Transport",
+        ),
+    ]
+    dataset = build_current_report_dataset(sample_participants(), purchases, scope="open")
+    captured = {}
+
+    def fake_write_pdf_report(output_path, **kwargs):
+        captured["chart_paths"] = kwargs["chart_paths"]
+        output_path.write_bytes(b"%PDF smoke")
+        return output_path
+
+    monkeypatch.setattr(current_report, "write_pdf_report", fake_write_pdf_report)
+
+    generate_current_report(dataset, tmp_path, "pdf")
+
+    assert "operations_by_day.png" in {path.name for path in captured["chart_paths"]}
 
 
 def test_pdf_renderer_hides_purchase_service_columns(tmp_path, monkeypatch):

@@ -80,6 +80,22 @@ def test_report_service_builds_current_report_result(tmp_path):
     assert all(file.local_path is not None for file in result.files)
 
 
+def test_report_service_skips_single_day_current_operations_chart(tmp_path):
+    repository = make_single_day_analytics_repository(tmp_path)
+    service = ReportService(repository, repository, repository)
+
+    result = service.build_current_report(
+        LOCAL_TENANT_ID,
+        scope="open",
+        formats={"png"},
+        output_root=tmp_path / "reports" / "current",
+    )
+
+    assert any(warning["warning_type"] == "chart_not_enough_data" for warning in result.warnings)
+    assert "operations_by_day" not in result.metadata["charts_generated"]
+    assert not any(file.filename == "operations_by_day.png" for file in result.files)
+
+
 def test_report_service_builds_analytics_report_result(tmp_path):
     repository = make_repository(tmp_path)
     service = ReportService(repository, repository, repository)

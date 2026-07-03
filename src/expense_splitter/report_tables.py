@@ -13,6 +13,7 @@ BALANCE_EXPLANATION = (
 )
 CHART_DISPLAY_TITLES = {
     "balances.png": BALANCE_CHART_TITLE,
+    "operations_by_day.png": "Операции по дням",
     "period_trend.png": "Динамика расходов за период",
     "spending_by_category.png": "Расходы по категориям",
     "spending_by_payer.png": "Расходы по плательщикам",

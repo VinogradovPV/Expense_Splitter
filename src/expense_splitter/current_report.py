@@ -54,9 +54,11 @@ from expense_splitter.ui_labels import (
     label_for_scope,
 )
 from expense_splitter.visual.palette import (
+    EXPENSE_DIMENSION_COLOR_MAP,
     PALETTE_NAME,
     PALETTE_VERSION,
     QUALITATIVE_PALETTE,
+    build_period_color_map,
     build_stable_color_map,
     color_for_balance_status,
 )
@@ -65,6 +67,9 @@ SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "pdf", "all"}
 SUPPORTED_SCOPES = {"open", "all"}
 CSV_ENCODING = "utf-8-sig"
 EMPTY_OPEN_SCOPE_MESSAGE = "Нет открытых покупок для текущих взаиморасчетов."
+OPERATIONS_BY_DAY_FILENAME = "operations_by_day.png"
+OPERATIONS_BY_DAY_WARNING_TYPE = "chart_not_enough_data"
+OPERATIONS_BY_DAY_WARNING_MESSAGE = "Недостаточно дат для построения графика операций по дням."
 
 TABLE_SPECS = (
     ("summary.csv", "Сводка"),
@@ -78,10 +83,11 @@ TABLE_SPECS = (
 )
 
 CHART_SPECS = (
+    ("balances.png", chart_display_title("balances.png")),
+    ("participant_share.png", chart_display_title("participant_share.png")),
+    (OPERATIONS_BY_DAY_FILENAME, chart_display_title(OPERATIONS_BY_DAY_FILENAME)),
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
-    ("participant_share.png", chart_display_title("participant_share.png")),
-    ("balances.png", chart_display_title("balances.png")),
     ("top_purchases.png", "Крупнейшие покупки"),
 )
 
@@ -151,6 +157,13 @@ class CurrentReportDataset:
     warnings: list[dict[str, object]]
 
 
+@dataclass(frozen=True)
+class DailyOperationPoint:
+    date: date
+    total_amount: Decimal
+    purchase_count: int
+
+
 def build_current_report_dataset(
     participants: Sequence[Participant | str],
     purchases: Sequence[Purchase],
@@ -203,6 +216,7 @@ def generate_current_report(
 
     warnings = [dict(row) for row in dataset.warnings]
     generated: list[Path] = []
+    chart_paths: list[Path] = []
 
     if format_key in {"csv", "html", "xlsx", "pdf", "all"}:
         generated.extend(write_current_csv_tables(dataset, tables_dir, warnings))
@@ -217,12 +231,22 @@ def generate_current_report(
 
     if format_key in {"markdown", "html", "all"}:
         generated.append(
-            write_current_markdown(dataset, report_dir / "current_state_report.md", warnings)
+            write_current_markdown(
+                dataset,
+                report_dir / "current_state_report.md",
+                warnings,
+                chart_paths=chart_paths,
+            )
         )
 
     if format_key in {"html", "all"}:
         generated.append(
-            write_current_html(dataset, report_dir / "current_state_dashboard.html", warnings)
+            write_current_html(
+                dataset,
+                report_dir / "current_state_dashboard.html",
+                warnings,
+                chart_paths=chart_paths,
+            )
         )
 
     if format_key in {"xlsx", "all"}:
@@ -232,6 +256,7 @@ def generate_current_report(
                 report_dir / "current_state.xlsx",
                 tables_dir,
                 charts_dir,
+                chart_paths=chart_paths,
             )
         )
 
@@ -244,12 +269,13 @@ def generate_current_report(
                 tables_dir=tables_dir,
                 table_specs=CURRENT_PDF_TABLES,
                 charts_dir=charts_dir,
+                chart_paths=chart_paths,
             )
         )
 
     metadata_path = report_dir / "metadata.json"
     generated.append(metadata_path)
-    write_current_metadata(dataset, metadata_path, generated, warnings, report_dir)
+    write_current_metadata(dataset, metadata_path, generated, warnings, report_dir, chart_paths)
     return report_dir
 
 
@@ -358,6 +384,7 @@ def write_current_markdown(
     dataset: CurrentReportDataset,
     path: Path,
     warnings: Sequence[dict[str, object]],
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
     summary = dataset.summary
     lines = [
@@ -449,11 +476,10 @@ def write_current_markdown(
         _warning_rows(warnings),
     )
 
-    chart_dir = path.parent / "charts"
-    chart_paths = sorted(chart_dir.glob("*.png")) if chart_dir.exists() else []
-    if chart_paths:
+    current_chart_paths = sorted(chart_paths, key=_chart_sort_key)
+    if current_chart_paths:
         lines.extend(["## Графики", ""])
-        for chart_path in chart_paths:
+        for chart_path in current_chart_paths:
             title = chart_display_title(chart_path)
             lines.extend([f"![{title}](charts/{chart_path.name})", ""])
 
@@ -466,6 +492,7 @@ def write_current_html(
     dataset: CurrentReportDataset,
     path: Path,
     warnings: Sequence[dict[str, object]],
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
     summary = dataset.summary
     cards = (
@@ -482,9 +509,8 @@ def write_current_html(
     table_html = "".join(
         _html_table(path.parent, filename, title) for filename, title in TABLE_SPECS
     )
-    chart_html = "".join(
-        _html_chart(path.parent, filename, title) for filename, title in CHART_SPECS
-    )
+    current_chart_paths = sorted(chart_paths, key=_chart_sort_key)
+    chart_html = "".join(_html_chart(chart_path) for chart_path in current_chart_paths)
     warning_items = "".join(f"<li>{escape(str(row.get('message', '')))}</li>" for row in warnings)
     warnings_html = f"<ul>{warning_items}</ul>" if warning_items else "<p>Предупреждений нет.</p>"
     csv_links = "".join(
@@ -525,6 +551,7 @@ def write_current_xlsx(
     path: Path,
     tables_dir: Path,
     charts_dir: Path,
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
     workbook = Workbook()
     workbook.remove(workbook.active)
@@ -546,7 +573,7 @@ def write_current_xlsx(
             rows_for_visual_table(filename, _read_csv(tables_dir / filename)),
         )
     charts_sheet = workbook.create_sheet(label_for_report_sheet("Charts"))
-    _write_charts_sheet(charts_sheet, charts_dir)
+    _write_charts_sheet(charts_sheet, charts_dir, chart_paths)
     workbook.active = 0
     workbook.calculation.fullCalcOnLoad = True
     workbook.calculation.forceFullCalc = True
@@ -560,16 +587,25 @@ def write_current_charts(
     output_dir: Path,
 ) -> tuple[list[Path], list[dict[str, object]]]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    _clean_known_chart_outputs(output_dir)
     generated: list[Path] = []
     warnings: list[dict[str, object]] = []
     specs = (
+        ("balances.png", dataset.balances, _chart_balances),
+        ("participant_share.png", dataset.by_participant, _chart_participant_share),
+        (
+            OPERATIONS_BY_DAY_FILENAME,
+            aggregate_daily_operations(dataset.purchases),
+            _chart_operations_by_day,
+        ),
         ("spending_by_category.png", dataset.by_category, _chart_category),
         ("spending_by_payer.png", dataset.by_payer, _chart_payer),
-        ("participant_share.png", dataset.by_participant, _chart_participant_share),
-        ("balances.png", dataset.balances, _chart_balances),
         ("top_purchases.png", dataset.top_purchases, _chart_top_purchases),
     )
     for filename, rows, renderer in specs:
+        if filename == OPERATIONS_BY_DAY_FILENAME and dataset.purchases and len(rows) < 2:
+            warnings.append(_operations_by_day_not_enough_data_warning())
+            continue
         if not dataset.purchases or not rows:
             warnings.append(_chart_warning(filename))
             continue
@@ -579,13 +615,24 @@ def write_current_charts(
     return generated, warnings
 
 
+def _clean_known_chart_outputs(output_dir: Path) -> None:
+    for filename, _title in CHART_SPECS:
+        path = output_dir / filename
+        if path.exists():
+            path.unlink()
+
+
 def write_current_metadata(
     dataset: CurrentReportDataset,
     path: Path,
     generated_files: Sequence[Path],
     warnings: Sequence[dict[str, object]],
     report_dir: Path,
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
+    generated_chart_keys = [
+        chart_path.stem for chart_path in sorted(chart_paths, key=_chart_sort_key)
+    ]
     metadata = {
         "schema_version": 1,
         "report_type": "current_state",
@@ -594,6 +641,18 @@ def write_current_metadata(
         "summary": {key: _json_value(value) for key, value in dataset.summary.items()},
         "palette": {"name": PALETTE_NAME, "version": PALETTE_VERSION},
         "warning_count": len(warnings),
+        "warnings": [dict(row) for row in warnings],
+        "charts_generated": generated_chart_keys,
+        "charts_skipped": [
+            {
+                "chart": row.get("chart"),
+                "reason": row.get("warning_type"),
+                "message": row.get("message"),
+            }
+            for row in warnings
+            if row.get("chart")
+            and row.get("warning_type") in {"chart_no_data", "chart_not_enough_data"}
+        ],
         "files": sorted(
             str(item.relative_to(report_dir)).replace("\\", "/")
             for item in generated_files
@@ -647,6 +706,24 @@ def _with_share_percent(
         enriched["share_percent"] = share
         result.append(enriched)
     return result
+
+
+def aggregate_daily_operations(purchases: Sequence[Purchase]) -> list[DailyOperationPoint]:
+    totals: dict[date, Decimal] = {}
+    counts: dict[date, int] = {}
+    for purchase in purchases:
+        if purchase.date is None:
+            continue
+        totals[purchase.date] = totals.get(purchase.date, Decimal("0.00")) + purchase.amount
+        counts[purchase.date] = counts.get(purchase.date, 0) + 1
+    return [
+        DailyOperationPoint(
+            date=operation_date,
+            total_amount=totals[operation_date],
+            purchase_count=counts[operation_date],
+        )
+        for operation_date in sorted(totals)
+    ]
 
 
 def _warnings(
@@ -873,17 +950,32 @@ def _is_numeric_text(value: str) -> bool:
     return True
 
 
-def _html_chart(report_dir: Path, filename: str, title: str) -> str:
-    path = report_dir / "charts" / filename
-    if not path.exists():
-        return (
-            f'<article class="panel"><h3>{escape(title)}</h3>'
-            '<p class="missing">График не создан: нет данных.</p></article>'
-        )
+def _html_chart(
+    path_or_dir: Path,
+    filename: str | None = None,
+    title: str | None = None,
+) -> str:
+    if filename is not None:
+        path = path_or_dir / "charts" / filename
+        chart_title = title or chart_display_title(filename)
+        if not path.exists():
+            return (
+                f'<article class="panel"><h3>{escape(chart_title)}</h3>'
+                '<p class="missing">График не создан: нет данных.</p></article>'
+            )
+    else:
+        path = path_or_dir
+        chart_title = chart_display_title(path)
     return (
-        f'<article class="panel"><h3>{escape(title)}</h3>'
-        f'<img class="chart" src="charts/{escape(filename)}" alt="{escape(title)}"></article>'
+        f'<article class="panel"><h3>{escape(chart_title)}</h3>'
+        f'<img class="chart" src="charts/{escape(path.name)}" alt="{escape(chart_title)}">'
+        "</article>"
     )
+
+
+def _chart_sort_key(path: Path) -> int:
+    order = {filename: index for index, (filename, _title) in enumerate(CHART_SPECS)}
+    return order.get(path.name, len(order))
 
 
 def _save_barh(
@@ -1003,6 +1095,35 @@ def _chart_balances(dataset: CurrentReportDataset, path: Path) -> None:
     )
 
 
+def _chart_operations_by_day(dataset: CurrentReportDataset, path: Path) -> None:
+    rows = aggregate_daily_operations(dataset.purchases)
+    labels = [row.date.isoformat() for row in rows]
+    values = [float(row.total_amount) for row in rows]
+    period_colors = build_period_color_map(labels)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(labels, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
+    ax.scatter(labels, values, color=[period_colors[label] for label in labels], zorder=3)
+    for label, value in zip(labels, values):
+        ax.annotate(
+            _format_money(value),
+            (label, value),
+            textcoords="offset points",
+            xytext=(0, 8),
+            ha="center",
+            fontsize=9,
+        )
+    ax.set_title(chart_display_title(OPERATIONS_BY_DAY_FILENAME))
+    ax.set_xlabel("Дата")
+    ax.set_ylabel("Сумма")
+    ax.grid(alpha=0.2)
+    high = max(values) if values else 0.0
+    ax.set_ylim(bottom=0, top=high * 1.18 if high > 0 else 1.0)
+    ax.tick_params(axis="x", rotation=45)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
     rows = list(reversed(dataset.top_purchases))
     _save_barh(
@@ -1018,6 +1139,7 @@ def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
 
 def _chart_warning(filename: str) -> dict[str, object]:
     return {
+        "chart": Path(filename).stem,
         "warning_type": "chart_no_data",
         "purchase_id": "",
         "purchase_name": "",
@@ -1025,6 +1147,16 @@ def _chart_warning(filename: str) -> dict[str, object]:
             f"График «{chart_display_title(filename)}» не создан: "
             "нет данных для текущего режима расчета."
         ),
+    }
+
+
+def _operations_by_day_not_enough_data_warning() -> dict[str, object]:
+    return {
+        "chart": Path(OPERATIONS_BY_DAY_FILENAME).stem,
+        "warning_type": OPERATIONS_BY_DAY_WARNING_TYPE,
+        "purchase_id": "",
+        "purchase_name": "",
+        "message": OPERATIONS_BY_DAY_WARNING_MESSAGE,
     }
 
 
@@ -1119,7 +1251,11 @@ def _is_money(header: str, row: list[str]) -> bool:
     return header in money_headers or (header == "Значение" and row and row[0] in money_summary)
 
 
-def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
+def _write_charts_sheet(
+    worksheet,
+    charts_dir: Path,
+    chart_paths: Sequence[Path] = (),
+) -> None:
     primary = "285F8F"
     muted = "64748B"
     secondary = "DCE8F2"
@@ -1129,14 +1265,20 @@ def _write_charts_sheet(worksheet, charts_dir: Path) -> None:
     worksheet["A1"].font = Font(size=16, bold=True, color="FFFFFF")
     worksheet["A1"].fill = PatternFill("solid", fgColor=primary)
     worksheet.row_dimensions[1].height = 28
-    chart_paths = sorted(charts_dir.glob("*.png")) if charts_dir.exists() else []
-    if not chart_paths:
+    current_chart_paths = (
+        sorted(chart_paths, key=_chart_sort_key)
+        if chart_paths
+        else sorted(charts_dir.glob("*.png"))
+        if charts_dir.exists()
+        else []
+    )
+    if not current_chart_paths:
         worksheet["A3"] = "Графики не созданы: нет данных."
         worksheet["A3"].font = Font(italic=True, color=muted)
         worksheet["A3"].fill = PatternFill("solid", fgColor=secondary)
         return
     row = 3
-    for chart_path in chart_paths:
+    for chart_path in current_chart_paths:
         worksheet.cell(row, 1, chart_display_title(chart_path))
         worksheet.cell(row, 1).font = Font(bold=True, color=primary)
         row += 1

@@ -46,12 +46,20 @@ reports/current_state/open_<YYYY-MM-DD_HH-MM-SS>/
 │   ├── settlements.csv
 │   └── warnings.csv
 └── charts/
+    ├── balances.png
+    ├── participant_share.png
+    ├── operations_by_day.png  # только если есть минимум две уникальные даты
     ├── spending_by_category.png
     ├── spending_by_payer.png
-    ├── participant_share.png
-    ├── balances.png
     └── top_purchases.png
 ```
+
+Current-report строит график `operations_by_day.png` с пользовательским названием `Операции по
+дням`, если в выбранном scope есть минимум две уникальные даты покупок. Несколько покупок в один
+день агрегируются в дневную сумму. Если уникальная дата одна, график не создается, а отчет
+показывает предупреждение `Недостаточно дат для построения графика операций по дням.`. PDF, HTML,
+XLSX и ReportService используют только графики текущего запуска, поэтому старый
+`operations_by_day.png` не попадает в новый отчет.
 
 ## Исторический отчет settlement period
 
