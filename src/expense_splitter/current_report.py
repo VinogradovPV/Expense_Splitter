@@ -92,13 +92,18 @@ CHART_SPECS = (
 )
 
 CURRENT_PDF_TABLES = (
-    PdfTableSpec("settlements.csv", "Итоговые переводы"),
-    PdfTableSpec("by_category.csv", "Расходы по категориям"),
-    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
-    PdfTableSpec("balances.csv", "Балансы"),
-    PdfTableSpec("purchases.csv", "Покупки"),
-    PdfTableSpec("warnings.csv", "Предупреждения"),
+    PdfTableSpec(
+        "settlements.csv",
+        "Итоговые переводы",
+        display_mode="financial",
+        section="overview",
+    ),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам", section="overview"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям", section="overview"),
+    PdfTableSpec("warnings.csv", "Предупреждения", display_mode="callout", section="overview"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека", section="participants"),
+    PdfTableSpec("balances.csv", "Балансы", display_mode="financial", section="participants"),
+    PdfTableSpec("purchases.csv", "Покупки", display_mode="full", section="participants"),
 )
 
 CURRENT_HTML_CSS = """
@@ -267,9 +272,24 @@ def generate_current_report(
                 title="Отчет по текущим взаиморасчетам",
                 metadata_rows=_summary_rows(dataset),
                 tables_dir=tables_dir,
-                table_specs=CURRENT_PDF_TABLES,
+                table_specs=(
+                    *CURRENT_PDF_TABLES,
+                    *(
+                        (
+                            PdfTableSpec(
+                                "purchases.csv",
+                                "Все покупки",
+                                display_mode="appendix",
+                                section="appendix",
+                            ),
+                        )
+                        if len(dataset.purchases) > 15
+                        else ()
+                    ),
+                ),
                 charts_dir=charts_dir,
                 chart_paths=chart_paths,
+                report_kind="current",
             )
         )
 
@@ -1039,6 +1059,23 @@ def _format_money(value: float) -> str:
     return f"{value:,.2f}".replace(",", " ")
 
 
+def _line_label_offset(index: int, values: Sequence[float]) -> tuple[int, int, str]:
+    value = values[index]
+    previous_value = values[index - 1] if index > 0 else None
+    next_value = values[index + 1] if index < len(values) - 1 else None
+
+    if previous_value is not None and next_value is not None:
+        if value <= previous_value and value <= next_value:
+            return 0, -14, "top"
+        if value >= previous_value and value >= next_value:
+            return 0, 10, "bottom"
+
+    neighbor = next_value if previous_value is None else previous_value
+    if neighbor is not None and value < neighbor:
+        return 0, -14, "top"
+    return 0, 10, "bottom"
+
+
 def _chart_category(dataset: CurrentReportDataset, path: Path) -> None:
     labels = [str(row["category"]) for row in dataset.by_category]
     colors = build_stable_color_map(sorted(labels))
@@ -1103,13 +1140,15 @@ def _chart_operations_by_day(dataset: CurrentReportDataset, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(labels, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
     ax.scatter(labels, values, color=[period_colors[label] for label in labels], zorder=3)
-    for label, value in zip(labels, values):
+    for index, (label, value) in enumerate(zip(labels, values)):
+        x_offset, y_offset, vertical_alignment = _line_label_offset(index, values)
         ax.annotate(
             _format_money(value),
             (label, value),
             textcoords="offset points",
-            xytext=(0, 8),
+            xytext=(x_offset, y_offset),
             ha="center",
+            va=vertical_alignment,
             fontsize=9,
         )
     ax.set_title(chart_display_title(OPERATIONS_BY_DAY_FILENAME))
@@ -1125,7 +1164,7 @@ def _chart_operations_by_day(dataset: CurrentReportDataset, path: Path) -> None:
 
 
 def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
-    rows = list(reversed(dataset.top_purchases))
+    rows = dataset.top_purchases
     _save_barh(
         path,
         [str(row["purchase_name"]) for row in rows],

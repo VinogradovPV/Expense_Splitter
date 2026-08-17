@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from expense_splitter.current_report import (
     OPERATIONS_BY_DAY_WARNING_MESSAGE,
+    _chart_top_purchases,
+    _line_label_offset,
     aggregate_daily_operations,
     build_current_report_dataset,
     generate_current_report,
@@ -61,6 +63,33 @@ def test_current_report_two_unique_dates_builds_operations_by_day_chart(tmp_path
     ]
     assert "operations_by_day.png" in {path.name for path in paths}
     assert not any(warning["warning_type"] == "chart_not_enough_data" for warning in warnings)
+
+
+def test_current_report_operations_by_day_label_offsets_avoid_local_minima():
+    assert _line_label_offset(1, [1169.0, 90.0, 580.0]) == (0, -14, "top")
+    assert _line_label_offset(0, [1169.0, 90.0, 580.0]) == (0, 10, "bottom")
+
+
+def test_current_report_top_purchases_chart_keeps_largest_purchase_first(tmp_path, monkeypatch):
+    captured = {}
+    current_dataset = dataset(
+        [
+            purchase("small", date(2026, 7, 1), "90.00"),
+            purchase("large", date(2026, 7, 2), "760.00"),
+            purchase("middle", date(2026, 7, 3), "196.00"),
+        ]
+    )
+
+    def fake_save_barh(path, labels, values, colors, title, xlabel, **kwargs):
+        captured["labels"] = labels
+        captured["values"] = values
+
+    monkeypatch.setattr("expense_splitter.current_report._save_barh", fake_save_barh)
+
+    _chart_top_purchases(current_dataset, tmp_path / "top_purchases.png")
+
+    assert captured["labels"] == ["large", "middle", "small"]
+    assert captured["values"] == [760.0, 196.0, 90.0]
 
 
 def test_current_report_one_unique_date_skips_operations_by_day_with_warning(tmp_path):

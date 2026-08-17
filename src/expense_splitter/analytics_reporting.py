@@ -23,14 +23,13 @@ from expense_splitter.visual.palette import PALETTE_NAME, PALETTE_VERSION
 SUPPORTED_FORMATS = {"markdown", "csv", "png", "html", "xlsx", "pdf", "all"}
 CSV_ENCODING = "utf-8-sig"
 ANALYTICS_PDF_TABLES = (
-    PdfTableSpec("summary.csv", "Сводка"),
-    PdfTableSpec("by_category.csv", "Расходы по категориям"),
-    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
-    PdfTableSpec("balances.csv", "Балансы"),
-    PdfTableSpec("settlements.csv", "Переводы"),
-    PdfTableSpec("purchases.csv", "Покупки"),
-    PdfTableSpec("warnings.csv", "Предупреждения"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям", section="overview"),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам", section="overview"),
+    PdfTableSpec("warnings.csv", "Предупреждения", display_mode="callout", section="overview"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека", section="participants"),
+    PdfTableSpec("balances.csv", "Балансы", display_mode="financial", section="participants"),
+    PdfTableSpec("settlements.csv", "Переводы", display_mode="financial", section="participants"),
+    PdfTableSpec("purchases.csv", "Все покупки", display_mode="appendix", section="appendix"),
 )
 
 
@@ -107,6 +106,7 @@ def generate_analytics_report(
                 table_specs=ANALYTICS_PDF_TABLES,
                 charts_dir=report_dir / "charts",
                 chart_paths=chart_paths,
+                report_kind="analytics",
             )
         )
 

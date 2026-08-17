@@ -73,14 +73,18 @@ TABLE_SPECS = (
 )
 
 SETTLEMENT_PERIOD_PDF_TABLES = (
-    PdfTableSpec("summary.csv", "Сводка"),
-    PdfTableSpec("by_category.csv", "Расходы по категориям"),
-    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
-    PdfTableSpec("balances.csv", "Балансы"),
-    PdfTableSpec("settlements.csv", "Итоговые переводы"),
-    PdfTableSpec("purchases.csv", "Покупки периода"),
-    PdfTableSpec("warnings.csv", "Предупреждения"),
+    PdfTableSpec(
+        "settlements.csv",
+        "Итоговые переводы",
+        display_mode="financial",
+        section="overview",
+    ),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам", section="overview"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям", section="overview"),
+    PdfTableSpec("warnings.csv", "Предупреждения", display_mode="callout", section="overview"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека", section="participants"),
+    PdfTableSpec("balances.csv", "Балансы", display_mode="financial", section="participants"),
+    PdfTableSpec("purchases.csv", "Покупки периода", display_mode="full", section="participants"),
 )
 
 
@@ -220,8 +224,23 @@ def generate_settlement_period_report(
                 title=REPORT_TITLE,
                 metadata_rows=_summary_rows(dataset),
                 tables_dir=tables_dir,
-                table_specs=SETTLEMENT_PERIOD_PDF_TABLES,
+                table_specs=(
+                    *SETTLEMENT_PERIOD_PDF_TABLES,
+                    *(
+                        (
+                            PdfTableSpec(
+                                "purchases.csv",
+                                "Все покупки",
+                                display_mode="appendix",
+                                section="appendix",
+                            ),
+                        )
+                        if len(dataset.purchases) > 15
+                        else ()
+                    ),
+                ),
                 charts_dir=charts_dir,
+                report_kind="settlement",
             )
         )
 

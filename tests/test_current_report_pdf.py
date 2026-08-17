@@ -31,6 +31,11 @@ def test_current_report_format_pdf_creates_pdf(tmp_path):
     assert_pdf_created(report_dir / "current_state.pdf")
     assert not (report_dir / "current_state_dashboard.html").exists()
 
+    pypdf = pytest.importorskip("pypdf")
+    reader = pypdf.PdfReader(str(report_dir / "current_state.pdf"))
+    assert len(reader.pages) <= 4
+    assert all((page.extract_text() or "").strip() for page in reader.pages)
+
 
 def test_current_report_format_all_includes_pdf(tmp_path):
     require_pdf_font()

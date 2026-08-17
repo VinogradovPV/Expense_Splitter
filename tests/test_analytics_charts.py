@@ -12,6 +12,8 @@ from expense_splitter.analytics_charts import (
     CHART_FILENAMES,
     _balances,
     _format_chart_value,
+    _line_label_offset,
+    _top_purchases,
     generate_analytics_charts,
     set_non_negative_x_axis,
 )
@@ -127,6 +129,62 @@ def test_period_trend_builds_for_two_unique_dates_with_daily_totals(tmp_path):
     ]
     assert "period_trend.png" in {path.name for path in paths}
     assert not any(warning["warning_type"] == "chart_not_enough_data" for warning in warnings)
+
+
+def test_period_trend_label_offsets_keep_local_minima_below_line():
+    assert _line_label_offset(4, [1169.0, 90.0, 580.0, 970.0, 196.0, 911.0]) == (
+        0,
+        -14,
+        "top",
+    )
+    assert _line_label_offset(3, [1169.0, 90.0, 580.0, 970.0, 196.0, 911.0]) == (
+        0,
+        10,
+        "bottom",
+    )
+
+
+def test_top_purchases_chart_keeps_largest_purchase_first(tmp_path, monkeypatch):
+    captured = {}
+    dataset = build_dataset_with_purchases(
+        [
+            Purchase(
+                id="small",
+                date=date(2026, 7, 1),
+                amount=Decimal("90.00"),
+                payer="Alice",
+                participants=["Alice", "Bob"],
+                purchase_name="Small",
+            ),
+            Purchase(
+                id="large",
+                date=date(2026, 7, 2),
+                amount=Decimal("760.00"),
+                payer="Bob",
+                participants=["Alice", "Bob"],
+                purchase_name="Large",
+            ),
+            Purchase(
+                id="middle",
+                date=date(2026, 7, 3),
+                amount=Decimal("196.00"),
+                payer="Alice",
+                participants=["Alice", "Bob"],
+                purchase_name="Middle",
+            ),
+        ]
+    )
+
+    def fake_save_barh(path, labels, values, colors, title, xlabel, **kwargs):
+        captured["labels"] = labels
+        captured["values"] = values
+
+    monkeypatch.setattr("expense_splitter.analytics_charts._save_barh", fake_save_barh)
+
+    _top_purchases(dataset, tmp_path / "top_purchases.png")
+
+    assert captured["labels"] == ["Large", "Middle", "Small"]
+    assert captured["values"] == [760.0, 196.0, 90.0]
 
 
 def test_empty_dataset_returns_warnings_instead_of_failing(tmp_path):

@@ -1361,3 +1361,34 @@ install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`
 
 Manual smoke generated analytics/current/settlement PDF files under `.tmp/p2_rpt5_smoke_20260703`.
 Poppler is not available in the local environment, so PNG rendering of PDF pages was not performed.
+
+## P2.RPT.7 — Редизайн PDF-отчетов и компактная layout-система
+
+Дата: 2026-08-17
+Статус: implemented on `cloud/telegram-prep`; full quality gate passed.
+
+### Что изменено
+
+| Область | Изменение |
+|---|---|
+| Layout layer | Добавлены общие design tokens, KPI grid, table cards, two-column sections, chart grid, appendix и typed report manifest |
+| Summary | PDF показывает KPI-карточки и контекст периода без дублирующей таблицы `summary.csv` |
+| Tables | Короткие и финансовые таблицы используют компактные карточки; суммы выравниваются вправо |
+| Purchases | Основная таблица сокращена до пользовательских колонок и количества участников |
+| Analytics appendix | Полная таблица покупок вынесена в `Приложение: все покупки` |
+| Current/settlement appendix | Приложение добавляется при превышении лимита 15 покупок |
+| Charts | Порядок задается manifest текущего запуска; до четырех графиков размещаются на странице |
+| Warnings | Пустое состояние и предупреждения выводятся как компактный callout |
+
+Расчет долгов, settlement semantics, YAML/offline mode и структура CSV/XLSX не изменялись.
+
+### Проверки
+
+- Focused PDF/layout tests: 15 passed.
+- Full suite: 258 passed.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+- Manual smoke: current-report — 4 страницы; analytics — 4 основные страницы + appendix
+  (8 страниц всего для 63 покупок). Все проверенные страницы непустые, визуальный PNG-review — OK.

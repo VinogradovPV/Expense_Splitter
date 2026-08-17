@@ -165,6 +165,23 @@ def _format_chart_value(value: float) -> str:
     return f"{value:,.2f}".replace(",", " ")
 
 
+def _line_label_offset(index: int, values: list[float]) -> tuple[int, int, str]:
+    value = values[index]
+    previous_value = values[index - 1] if index > 0 else None
+    next_value = values[index + 1] if index < len(values) - 1 else None
+
+    if previous_value is not None and next_value is not None:
+        if value <= previous_value and value <= next_value:
+            return 0, -14, "top"
+        if value >= previous_value and value >= next_value:
+            return 0, 10, "bottom"
+
+    neighbor = next_value if previous_value is None else previous_value
+    if neighbor is not None and value < neighbor:
+        return 0, -14, "top"
+    return 0, 10, "bottom"
+
+
 def _spending_by_category(dataset: AnalyticsDataset, path: Path) -> None:
     labels = [str(row["category"]) for row in dataset.by_category]
     color_map = build_stable_color_map(sorted(labels))
@@ -230,16 +247,23 @@ def _period_trend_points(dataset: AnalyticsDataset) -> tuple[list[str], list[flo
 def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
     labels, values = _period_trend_points(dataset)
     period_colors = build_period_color_map(labels)
+    positions = list(range(len(labels)))
+    label_stride = max(1, (len(labels) + 11) // 12)
+    labeled_indexes = set(range(0, len(labels), label_stride)) | {len(labels) - 1}
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(labels, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
-    ax.scatter(labels, values, color=[period_colors[label] for label in labels], zorder=3)
-    for label, value in zip(labels, values):
+    ax.plot(positions, values, color=EXPENSE_DIMENSION_COLOR_MAP["Период"])
+    ax.scatter(positions, values, color=[period_colors[label] for label in labels], zorder=3)
+    for index, (label, value) in enumerate(zip(labels, values)):
+        if index not in labeled_indexes:
+            continue
+        x_offset, y_offset, vertical_alignment = _line_label_offset(index, values)
         ax.annotate(
             _format_chart_value(value),
-            (label, value),
+            (index, value),
             textcoords="offset points",
-            xytext=(0, 8),
+            xytext=(x_offset, y_offset),
             ha="center",
+            va=vertical_alignment,
             fontsize=9,
         )
     ax.set_title("Динамика расходов за период")
@@ -247,6 +271,8 @@ def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
     ax.set_ylabel("Сумма")
     ax.grid(alpha=0.2)
     ax.margins(y=0.2)
+    tick_indexes = sorted(labeled_indexes)
+    ax.set_xticks(tick_indexes, [labels[index] for index in tick_indexes])
     ax.tick_params(axis="x", rotation=45)
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -254,7 +280,7 @@ def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
 
 
 def _top_purchases(dataset: AnalyticsDataset, path: Path) -> None:
-    rows = list(reversed(dataset.top_purchases))
+    rows = dataset.top_purchases
     labels = [str(row["purchase_name"]) for row in rows]
     colors = [
         QUALITATIVE_PALETTE[(int(row["rank"]) - 1) % len(QUALITATIVE_PALETTE)] for row in rows
