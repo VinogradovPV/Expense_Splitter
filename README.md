@@ -290,6 +290,10 @@ PDF uses a compact A4 landscape layout: the first page shows KPI cards, short ta
 two-column grid, and charts are grouped up to four per page. Analytics keeps the full purchases
 table in `Приложение: все покупки`; current and settlement reports add the appendix only above the
 main-table limit. CSV and XLSX continue to contain the complete detail.
+Participant, payer and purchase labels always come from report data. Compact tables and charts may
+shorten long labels with an ellipsis, but never replace them with numbered surrogate names.
+Current-report shows up to three real participant names followed by `и еще N`; analytics appendix,
+CSV and XLSX retain the full participant list. Runtime report anonymization is not enabled.
 
 Purchase tables in all report formats use the same business sorting: payers are ordered by
 `payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by

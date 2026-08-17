@@ -25,7 +25,7 @@ def test_compact_purchase_rows_hide_service_fields_and_count_participants():
 
     assert compact == [
         ["Дата", "Покупка", "Категория", "Сумма", "Плательщик", "Участников"],
-        ["2026-06-30", "Кофе", "Еда", "100.00", "Alice", "2 участн."],
+        ["2026-06-30", "Кофе", "Еда", "100.00", "Alice", "Alice, Bob"],
     ]
 
 

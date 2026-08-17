@@ -173,6 +173,9 @@ chart may use negative values and the balance table includes an explanation of t
 The compact A4 landscape layout uses KPI cards, two-column table sections and a 2x2 chart grid.
 The main analytics pages no longer repeat the summary table or print every purchase. Full purchase
 detail is rendered in `Приложение: все покупки` and remains unchanged in CSV/XLSX.
+Participant, payer, category and purchase labels are sourced from the real report dataset. Compact
+chart labels may be truncated with an ellipsis, while the analytics appendix preserves the full
+purchase name and participant list. There is no implicit runtime anonymization.
 
 The purchases table is sorted by payer total descending, then by purchase amount descending inside
 each payer. CSV adds `payer_total` and `payer_rank` so the grouping remains machine-readable.

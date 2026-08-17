@@ -55,7 +55,8 @@ def test_analytics_format_all_includes_pdf(tmp_path):
 def test_analytics_pdf_moves_full_purchase_list_to_appendix(tmp_path):
     require_pdf_font()
     pypdf = pytest.importorskip("pypdf")
-    participants = [Participant(f"Участник {index}") for index in range(1, 8)]
+    participant_names = ["Павел", "Сергей", "Владимир", "Елена", "Эмилия", "Мария", "Максим"]
+    participants = [Participant(name) for name in participant_names]
     purchases = [
         Purchase(
             id=f"p-{index:02d}",
@@ -63,7 +64,7 @@ def test_analytics_pdf_moves_full_purchase_list_to_appendix(tmp_path):
             amount=Decimal(index * 10),
             payer=participants[index % 7].name,
             participants=[participant.name for participant in participants],
-            purchase_name=f"Покупка {index:02d}",
+            purchase_name=f"Арбуз Астрахань - партия {index:02d}",
             category=f"Категория {index % 4}",
         )
         for index in range(1, 64)
@@ -82,5 +83,8 @@ def test_analytics_pdf_moves_full_purchase_list_to_appendix(tmp_path):
     text = "\n".join(page_texts)
 
     assert "Приложение: все покупки" in text
-    assert "Покупка 63" in text
+    assert "Арбуз Астрахань - партия 63" in text
+    assert all(name in text for name in participant_names)
+    assert not any(f"Участник {index}" in text for index in range(1, 8))
+    assert not any(f"Покупка {index}" in text for index in range(1, 64))
     assert all(page_texts)

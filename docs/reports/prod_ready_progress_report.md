@@ -1392,3 +1392,36 @@ Poppler is not available in the local environment, so PNG rendering of PDF pages
 - `git diff --check`: OK.
 - Manual smoke: current-report — 4 страницы; analytics — 4 основные страницы + appendix
   (8 страниц всего для 63 покупок). Все проверенные страницы непустые, визуальный PNG-review — OK.
+
+## P2.RPT.7.1 — Реальные имена и названия в redesigned PDF
+
+Дата: 2026-08-17
+Статус: implemented on `cloud/telegram-prep`; full quality gate passed.
+
+### Причина и исправление
+
+Production report datasets и renderers не содержали runtime anonymization: суррогаты
+`Участник N` и `Покупка N` находились в synthetic fixtures предыдущего smoke/test. Fixtures для
+PDF regression заменены на реальные русские display names и purchase names. Дополнительно общий
+visual layer теперь гарантирует, что compact labels сохраняют начало исходного значения и только
+сокращаются многоточием.
+
+| Область | Изменение |
+|---|---|
+| Current tables | Реальные payer/participant/purchase labels; до трех имен + `и еще N` |
+| Wide purchase table | Режим `full` занимает всю строку, поэтому реальные названия остаются читаемыми |
+| Charts | Реальные participant/payer/purchase labels; предел 24/32 символа с многоточием |
+| Analytics appendix | Полные purchase name, payer, participants, category, amount и date без сокращения |
+| Missing values | `Без имени` для отсутствующего participant label, `н/д` для отсутствующего purchase name |
+| Anonymization | Не используется в production report path; synthetic labels допустимы только в fixtures |
+
+### Проверки
+
+- Focused PDF/label tests: 40 passed.
+- Full suite: 263 passed.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+- Manual smoke: current-report — 4 страницы; analytics — 7 страниц с appendix. Все страницы
+  непустые, семь реальных имен присутствуют, surrogate regex отсутствует, визуальный PNG-review — OK.

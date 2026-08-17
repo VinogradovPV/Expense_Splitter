@@ -41,8 +41,11 @@ from expense_splitter.report_tables import (
     BALANCE_CHART_XLABEL,
     BALANCE_EXPLANATION,
     BALANCE_RESULT_HEADER,
+    PARTICIPANT_LABEL_MAX_LENGTH,
+    PURCHASE_LABEL_MAX_LENGTH,
     chart_display_title,
     rows_for_visual_table,
+    truncate_display_label,
     visual_table_note,
 )
 from expense_splitter.settlement import calculate_settlements
@@ -1091,13 +1094,17 @@ def _chart_category(dataset: CurrentReportDataset, path: Path) -> None:
 
 
 def _chart_payer(dataset: CurrentReportDataset, path: Path) -> None:
-    labels = [str(row["payer"]) for row in dataset.by_payer]
-    colors = build_stable_color_map(labels)
+    source_labels = [str(row["payer"]) for row in dataset.by_payer]
+    labels = [
+        truncate_display_label(label, PARTICIPANT_LABEL_MAX_LENGTH, "Без имени")
+        for label in source_labels
+    ]
+    colors = build_stable_color_map(source_labels)
     _save_barh(
         path,
         labels,
         [float(row["total_paid"]) for row in dataset.by_payer],
-        [colors[label] for label in labels],
+        [colors[label] for label in source_labels],
         "Расходы по плательщикам",
         "Сумма",
         non_negative_x_axis=True,
@@ -1105,13 +1112,17 @@ def _chart_payer(dataset: CurrentReportDataset, path: Path) -> None:
 
 
 def _chart_participant_share(dataset: CurrentReportDataset, path: Path) -> None:
-    labels = [str(row["participant"]) for row in dataset.by_participant]
-    colors = build_stable_color_map(labels)
+    source_labels = [str(row["participant"]) for row in dataset.by_participant]
+    labels = [
+        truncate_display_label(label, PARTICIPANT_LABEL_MAX_LENGTH, "Без имени")
+        for label in source_labels
+    ]
+    colors = build_stable_color_map(source_labels)
     _save_barh(
         path,
         labels,
         [float(row["total_share"]) for row in dataset.by_participant],
-        [colors[label] for label in labels],
+        [colors[label] for label in source_labels],
         chart_display_title("participant_share.png"),
         "Сумма",
         non_negative_x_axis=True,
@@ -1123,7 +1134,14 @@ def _chart_balances(dataset: CurrentReportDataset, path: Path) -> None:
     colors = [color_for_balance_status(row.net) for row in rows]
     _save_barh(
         path,
-        [row.participant for row in rows],
+        [
+            truncate_display_label(
+                row.participant,
+                PARTICIPANT_LABEL_MAX_LENGTH,
+                "Без имени",
+            )
+            for row in rows
+        ],
         [float(row.net) for row in rows],
         colors,
         BALANCE_CHART_TITLE,
@@ -1167,7 +1185,14 @@ def _chart_top_purchases(dataset: CurrentReportDataset, path: Path) -> None:
     rows = dataset.top_purchases
     _save_barh(
         path,
-        [str(row["purchase_name"]) for row in rows],
+        [
+            truncate_display_label(
+                row["purchase_name"],
+                PURCHASE_LABEL_MAX_LENGTH,
+                "н/д",
+            )
+            for row in rows
+        ],
         [float(row["amount"]) for row in rows],
         [QUALITATIVE_PALETTE[(int(row["rank"]) - 1) % len(QUALITATIVE_PALETTE)] for row in rows],
         "Крупнейшие покупки",

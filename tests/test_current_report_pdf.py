@@ -1,4 +1,5 @@
-from datetime import date
+import re
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import pytest
 import expense_splitter.current_report as current_report
 import expense_splitter.report_pdf as report_pdf
 from expense_splitter.current_report import build_current_report_dataset, generate_current_report
-from expense_splitter.models import Purchase
+from expense_splitter.models import Participant, Purchase
 from expense_splitter.report_pdf import PdfTableSpec, discover_cyrillic_font
 from tests.test_current_report import sample_participants, sample_purchases
 
@@ -44,6 +45,46 @@ def test_current_report_format_all_includes_pdf(tmp_path):
     report_dir = generate_current_report(dataset, tmp_path, "all")
 
     assert_pdf_created(report_dir / "current_state.pdf")
+
+
+def test_current_pdf_preserves_real_participant_and_purchase_names(tmp_path):
+    require_pdf_font()
+    pypdf = pytest.importorskip("pypdf")
+    participant_names = ["Павел", "Сергей", "Владимир", "Елена", "Эмилия", "Мария", "Максим"]
+    purchase_names = [
+        "Арбуз Астрахань",
+        "Лимонад",
+        "Дыньки в помойке",
+        "Не вкусный арбуз от Вовы",
+        "Кофе",
+    ]
+    purchases = [
+        Purchase(
+            id=f"real-{index}",
+            date=date(2026, 8, 1) + timedelta(days=index),
+            amount=Decimal(300 + index * 100),
+            payer=participant_names[index],
+            participants=participant_names,
+            purchase_name=purchase_name,
+            category=("Еда", "Напитки", "Дом")[index % 3],
+        )
+        for index, purchase_name in enumerate(purchase_names)
+    ]
+    dataset = build_current_report_dataset(
+        [Participant(name) for name in participant_names],
+        purchases,
+        scope="open",
+    )
+
+    report_dir = generate_current_report(dataset, tmp_path, "pdf")
+    reader = pypdf.PdfReader(str(report_dir / "current_state.pdf"))
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    compact_text = "".join(text.split())
+
+    assert all(name in text for name in participant_names)
+    assert all("".join(name.split()) in compact_text for name in purchase_names)
+    assert re.search(r"Участник\s+\d+", text) is None
+    assert re.search(r"Покупка\s+\d+", text) is None
 
 
 def test_current_report_pdf_tables_start_with_settlements_without_duplicate_summary(

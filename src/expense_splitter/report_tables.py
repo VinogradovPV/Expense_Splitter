@@ -32,6 +32,32 @@ VISUAL_HEADER_RENAMES = {
     },
 }
 
+PARTICIPANT_LABEL_MAX_LENGTH = 24
+PURCHASE_LABEL_MAX_LENGTH = 32
+
+
+def truncate_display_label(value: object, max_length: int, fallback: str) -> str:
+    """Keep the source label recognizable while fitting a compact visual slot."""
+    label = str(value).strip() if value is not None else ""
+    label = label or fallback
+    if len(label) <= max_length:
+        return label
+    return f"{label[: max_length - 1].rstrip()}…"
+
+
+def compact_participant_list(value: object, visible_count: int = 3) -> str:
+    """Show real names in compact tables, abbreviating only a long list."""
+    names = [
+        truncate_display_label(name, PARTICIPANT_LABEL_MAX_LENGTH, "Без имени")
+        for name in str(value or "").split(",")
+        if name.strip()
+    ]
+    if not names:
+        return "Без имени"
+    visible = names[:visible_count]
+    suffix = f" и еще {len(names) - visible_count}" if len(names) > visible_count else ""
+    return ", ".join(visible) + suffix
+
 
 def rows_for_visual_table(filename: str | Path, rows: Sequence[Sequence[str]]) -> list[list[str]]:
     """Remove machine-only purchase columns from user-facing table renderers."""

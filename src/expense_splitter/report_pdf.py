@@ -6,7 +6,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
-from expense_splitter.report_tables import rows_for_visual_table, visual_table_note
+from expense_splitter.report_tables import (
+    PARTICIPANT_LABEL_MAX_LENGTH,
+    PURCHASE_LABEL_MAX_LENGTH,
+    compact_participant_list,
+    rows_for_visual_table,
+    truncate_display_label,
+    visual_table_note,
+)
 
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
@@ -282,6 +289,8 @@ def _load_manifest_tables(
             if csv_path.is_file()
             else []
         )
+        if spec.section != "appendix":
+            rows = _compact_identity_columns(rows)
         if spec.filename == "purchases.csv" and spec.section != "appendix":
             rows = _compact_purchase_rows(rows)
         result[spec.filename] = rows
@@ -366,29 +375,58 @@ def _format_kpi_value(value: object) -> str:
 
 
 def _table_grid(specs, table_data, styles, width, tools, tokens) -> list[object]:
-    cards = [
-        _table_card(spec, table_data.get(spec.filename, []), styles, width * 0.48, tools, tokens)
-        for spec in specs
-    ]
-    result: list[object] = []
-    for index in range(0, len(cards), 2):
-        pair = cards[index : index + 2]
-        if len(pair) == 1:
-            pair.append("")
-        grid = tools["Table"]([pair], colWidths=[width * 0.49, width * 0.49])
-        grid.setStyle(
-            tools["TableStyle"](
+    rows, spans, pending = [], [], []
+    for spec in specs:
+        if spec.display_mode == "full":
+            if pending:
+                rows.append([pending[0], ""])
+                pending = []
+            row_index = len(rows)
+            rows.append(
                 [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    _table_card(
+                        spec,
+                        table_data.get(spec.filename, []),
+                        styles,
+                        width * 0.96,
+                        tools,
+                        tokens,
+                    ),
+                    "",
                 ]
             )
+            spans.append(("SPAN", (0, row_index), (1, row_index)))
+            continue
+        pending.append(
+            _table_card(
+                spec,
+                table_data.get(spec.filename, []),
+                styles,
+                width * 0.48,
+                tools,
+                tokens,
+            )
         )
-        result.append(grid)
-    return result
+        if len(pending) == 2:
+            rows.append(pending)
+            pending = []
+    if pending:
+        rows.append([pending[0], ""])
+
+    grid = tools["Table"](rows, colWidths=[width * 0.49, width * 0.49])
+    grid.setStyle(
+        tools["TableStyle"](
+            [
+                *spans,
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+    return [grid]
 
 
 def _table_card(spec, rows, styles, width, tools, tokens):
@@ -600,10 +638,43 @@ def _compact_purchase_rows(rows: Sequence[Sequence[str]]) -> list[list[str]]:
         for index in indexes:
             value = row[index] if index < len(row) else ""
             if headers[index] == "Участники":
-                count = len([item for item in str(value).split(",") if item.strip()])
-                value = f"{count} участн."
+                value = compact_participant_list(value)
+            elif headers[index] in {"Покупка", "Наименование покупки"}:
+                value = truncate_display_label(value, PURCHASE_LABEL_MAX_LENGTH, "н/д")
+            elif headers[index] == "Плательщик":
+                value = truncate_display_label(
+                    value,
+                    PARTICIPANT_LABEL_MAX_LENGTH,
+                    "Без имени",
+                )
             compact.append(value)
         result.append(compact)
+    return result
+
+
+def _compact_identity_columns(rows: Sequence[Sequence[str]]) -> list[list[str]]:
+    if not rows:
+        return []
+    headers = [str(value) for value in rows[0]]
+    participant_headers = {
+        "Участник",
+        "Плательщик",
+        "От кого",
+        "Кому",
+    }
+    result = [list(headers)]
+    for source_row in rows[1:]:
+        row = list(source_row)
+        for index, header in enumerate(headers):
+            if index >= len(row):
+                continue
+            if header in participant_headers:
+                row[index] = truncate_display_label(
+                    row[index],
+                    PARTICIPANT_LABEL_MAX_LENGTH,
+                    "Без имени",
+                )
+        result.append(row)
     return result
 
 

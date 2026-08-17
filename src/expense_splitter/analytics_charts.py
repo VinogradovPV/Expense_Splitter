@@ -12,7 +12,10 @@ from expense_splitter.analytics import AnalyticsDataset, aggregate_daily_spendin
 from expense_splitter.report_tables import (
     BALANCE_CHART_TITLE,
     BALANCE_CHART_XLABEL,
+    PARTICIPANT_LABEL_MAX_LENGTH,
+    PURCHASE_LABEL_MAX_LENGTH,
     chart_display_title,
+    truncate_display_label,
 )
 from expense_splitter.visual.palette import (
     EXPENSE_DIMENSION_COLOR_MAP,
@@ -197,13 +200,17 @@ def _spending_by_category(dataset: AnalyticsDataset, path: Path) -> None:
 
 
 def _spending_by_payer(dataset: AnalyticsDataset, path: Path) -> None:
-    labels = [str(row["payer"]) for row in dataset.by_payer]
-    color_map = build_stable_color_map(labels)
+    source_labels = [str(row["payer"]) for row in dataset.by_payer]
+    labels = [
+        truncate_display_label(label, PARTICIPANT_LABEL_MAX_LENGTH, "Без имени")
+        for label in source_labels
+    ]
+    color_map = build_stable_color_map(source_labels)
     _save_barh(
         path,
         labels,
         [float(row["total_paid"]) for row in dataset.by_payer],
-        [color_map[label] for label in labels],
+        [color_map[label] for label in source_labels],
         "Расходы по плательщикам",
         "Сумма",
         non_negative_x_axis=True,
@@ -211,13 +218,17 @@ def _spending_by_payer(dataset: AnalyticsDataset, path: Path) -> None:
 
 
 def _participant_share(dataset: AnalyticsDataset, path: Path) -> None:
-    labels = [str(row["participant"]) for row in dataset.by_participant]
-    color_map = build_stable_color_map(labels)
+    source_labels = [str(row["participant"]) for row in dataset.by_participant]
+    labels = [
+        truncate_display_label(label, PARTICIPANT_LABEL_MAX_LENGTH, "Без имени")
+        for label in source_labels
+    ]
+    color_map = build_stable_color_map(source_labels)
     _save_barh(
         path,
         labels,
         [float(row["total_share"]) for row in dataset.by_participant],
-        [color_map[label] for label in labels],
+        [color_map[label] for label in source_labels],
         chart_display_title("participant_share.png"),
         "Сумма",
         non_negative_x_axis=True,
@@ -226,7 +237,14 @@ def _participant_share(dataset: AnalyticsDataset, path: Path) -> None:
 
 def _balances(dataset: AnalyticsDataset, path: Path) -> None:
     rows = sorted(dataset.balances, key=lambda row: row.net)
-    labels = [row.participant for row in rows]
+    labels = [
+        truncate_display_label(
+            row.participant,
+            PARTICIPANT_LABEL_MAX_LENGTH,
+            "Без имени",
+        )
+        for row in rows
+    ]
     colors = [color_for_balance_status(row.net) for row in rows]
     _save_barh(
         path,
@@ -281,7 +299,10 @@ def _period_trend(dataset: AnalyticsDataset, path: Path) -> None:
 
 def _top_purchases(dataset: AnalyticsDataset, path: Path) -> None:
     rows = dataset.top_purchases
-    labels = [str(row["purchase_name"]) for row in rows]
+    labels = [
+        truncate_display_label(row["purchase_name"], PURCHASE_LABEL_MAX_LENGTH, "н/д")
+        for row in rows
+    ]
     colors = [
         QUALITATIVE_PALETTE[(int(row["rank"]) - 1) % len(QUALITATIVE_PALETTE)] for row in rows
     ]
