@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html import escape
+from math import ceil
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -1059,7 +1060,7 @@ def set_non_negative_x_axis(ax, values: Sequence[float]) -> None:
 
 
 def _format_money(value: float) -> str:
-    return f"{value:,.2f}".replace(",", " ")
+    return f"{ceil(value):,}".replace(",", " ")
 
 
 def _line_label_offset(index: int, values: Sequence[float]) -> tuple[int, int, str]:

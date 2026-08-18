@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import ceil
 from pathlib import Path
 
 import matplotlib
@@ -165,7 +166,7 @@ def set_non_negative_x_axis(ax, values: list[float]) -> None:
 
 
 def _format_chart_value(value: float) -> str:
-    return f"{value:,.2f}".replace(",", " ")
+    return f"{ceil(value):,}".replace(",", " ")
 
 
 def _line_label_offset(index: int, values: list[float]) -> tuple[int, int, str]:

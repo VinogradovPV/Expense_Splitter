@@ -1,5 +1,12 @@
+import pytest
+
 import expense_splitter.report_pdf as report_pdf
-from expense_splitter.report_pdf import PdfTableSpec
+from expense_splitter.report_pdf import (
+    PdfTableSpec,
+    _column_widths_for_table,
+    _format_kpi_value,
+    _format_pdf_table_cell,
+)
 
 
 def test_report_manifest_preserves_requested_chart_order_and_ignores_stale_files(tmp_path):
@@ -60,3 +67,24 @@ def test_analytics_specs_use_appendix_instead_of_duplicate_summary():
             section="appendix",
         )
     ]
+
+
+def test_balance_table_reserves_single_line_width_for_first_headers():
+    width = 360
+    rows = [
+        ["Участник", "Оплачено", "Объем расходов на человека", "Итог: + получит, − должен"],
+        ["Владимир", "10022.00", "9054.97", "967.03"],
+    ]
+
+    widths = _column_widths_for_table(rows, width, "balances.csv")
+
+    assert widths == pytest.approx([64.8, 61.2, 108.0, 126.0])
+    assert sum(widths) == pytest.approx(width)
+
+
+def test_pdf_money_values_round_up_without_decimal_fraction():
+    assert _format_pdf_table_cell("10378.67", "Оплачено") == "10 379"
+    assert _format_pdf_table_cell("-2998.02", "Итог: + получит, − должен") == "-2 998"
+    assert _format_pdf_table_cell("15.39", "Доля оплат, %") == "15.39"
+    assert _format_kpi_value(1200.01, "Общая сумма") == "1 201"
+    assert _format_kpi_value(63, "Покупок") == "63"

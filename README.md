@@ -294,6 +294,8 @@ Participant, payer and purchase labels always come from report data. Compact tab
 shorten long labels with an ellipsis, but never replace them with numbered surrogate names.
 Current-report shows up to three real participant names followed by `и еще N`; analytics appendix,
 CSV and XLSX retain the full participant list. Runtime report anonymization is not enabled.
+PDF monetary values are displayed as whole numbers rounded upward. Calculations and precise values
+in CSV/XLSX remain unchanged.
 
 Purchase tables in all report formats use the same business sorting: payers are ordered by
 `payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by

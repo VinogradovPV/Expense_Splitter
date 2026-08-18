@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
@@ -18,6 +18,15 @@ from expense_splitter.report_tables import (
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
 PDF_MAIN_PURCHASE_ROWS_LIMIT = 15
+PDF_MONEY_HEADERS = {
+    "Сумма",
+    "Оплачено",
+    "Доля расходов",
+    "Объем расходов на человека",
+    "Баланс",
+    "Итоговый баланс",
+    "Итог: + получит, − должен",
+}
 FONT_CANDIDATES = (
     Path(r"C:\Windows\Fonts\arial.ttf"),
     Path(r"C:\Windows\Fonts\segoeui.ttf"),
@@ -335,7 +344,7 @@ def _kpi_grid(rows, styles, width, tools, tokens):
     cards = []
     for row in rows:
         label = str(row[0]).replace("Количество ", "").capitalize()
-        value = _format_kpi_value(row[1] if len(row) > 1 else "")
+        value = _format_kpi_value(row[1] if len(row) > 1 else "", label)
         cards.append(
             tools["Table"](
                 [
@@ -368,9 +377,9 @@ def _kpi_grid(rows, styles, width, tools, tokens):
     return tools["KeepTogether"]([grid])
 
 
-def _format_kpi_value(value: object) -> str:
-    if isinstance(value, (Decimal, float)):
-        return f"{value:,.2f}".replace(",", " ")
+def _format_kpi_value(value: object, label: str = "") -> str:
+    if _is_money_label(label):
+        return _format_pdf_amount(value)
     return _serialize(value)
 
 
@@ -437,7 +446,15 @@ def _table_card(spec, rows, styles, width, tools, tokens):
             message = rows[0][0] if rows else "Таблица не создана."
         body = tools["Paragraph"](_serialize(message), styles["Callout"])
     else:
-        body = _build_table(rows, styles, width, mode=spec.display_mode, tools=tools, tokens=tokens)
+        body = _build_table(
+            rows,
+            styles,
+            width,
+            mode=spec.display_mode,
+            tools=tools,
+            tokens=tokens,
+            filename=spec.filename,
+        )
     content = [[tools["Paragraph"](spec.title, styles["Heading2"])] , [body]]
     note = visual_table_note(spec.filename)
     if note:
@@ -568,27 +585,37 @@ def _styles(font_name: str, tools: dict[str, Any], tokens: PdfDesignTokens | Non
     return styles
 
 
-def _build_table(rows, styles, width, *, mode="compact", tools=None, tokens=None):
+def _build_table(
+    rows,
+    styles,
+    width,
+    *,
+    mode="compact",
+    tools=None,
+    tokens=None,
+    filename: str | None = None,
+):
     tools = tools or _load_reportlab_layout_tools()
     tokens = tokens or PdfDesignTokens()
     if not rows:
         rows = [["Нет данных."]]
     column_count = max(len(row) for row in rows)
     normalized = [list(row) + [""] * (column_count - len(row)) for row in rows]
-    col_widths = _column_widths(normalized, width)
+    col_widths = _column_widths_for_table(normalized, width, filename)
+    headers = [str(cell) for cell in normalized[0]]
     body = [
         [
             tools["Paragraph"](
-                _serialize(cell),
+                _format_pdf_table_cell(cell, headers[column_index], row_index == 0),
                 styles[
                     "CellRight"
                     if _is_numeric(cell)
                     else ("AppendixCell" if mode == "appendix" else "Cell")
                 ],
             )
-            for cell in row
+            for column_index, cell in enumerate(row)
         ]
-        for row in normalized
+        for row_index, row in enumerate(normalized)
     ]
     table = tools["Table"](body, colWidths=col_widths, repeatRows=1 if len(rows) > 1 else 0)
     table.setStyle(
@@ -689,6 +716,16 @@ def _column_widths(rows: Sequence[Sequence[object]], width: float) -> list[float
     return [width * weight / total for weight in weights]
 
 
+def _column_widths_for_table(
+    rows: Sequence[Sequence[object]],
+    width: float,
+    filename: str | None,
+) -> list[float]:
+    if Path(filename or "").name == "balances.csv" and max(map(len, rows), default=0) == 4:
+        return [width * ratio for ratio in (0.18, 0.17, 0.30, 0.35)]
+    return _column_widths(rows, width)
+
+
 def _image(path: Path, max_width: float, max_height: float, tools: dict[str, Any]) -> Any:
     image = tools["Image"](str(path))
     ratio = min(max_width / image.drawWidth, max_height / image.drawHeight, 1)
@@ -714,6 +751,30 @@ def _serialize(value: object) -> str:
     if isinstance(value, (list, tuple)):
         return ", ".join(str(item) for item in value)
     return "" if value is None else str(value)
+
+
+def _format_pdf_table_cell(value: object, header: str, is_header: bool = False) -> str:
+    if not is_header and header in PDF_MONEY_HEADERS:
+        return _format_pdf_amount(value)
+    return _serialize(value)
+
+
+def _format_pdf_amount(value: object) -> str:
+    raw = str(value).strip().replace(" ", "")
+    try:
+        amount = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return _serialize(value)
+    rounded = amount.to_integral_value(rounding=ROUND_CEILING)
+    return f"{rounded:,.0f}".replace(",", " ")
+
+
+def _is_money_label(label: str) -> bool:
+    normalized = label.casefold()
+    return any(
+        marker in normalized
+        for marker in ("сумма", "средний чек", "средняя покупка")
+    )
 
 
 def _is_numeric(value: object) -> bool:
