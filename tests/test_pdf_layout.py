@@ -2,7 +2,9 @@ import pytest
 
 import expense_splitter.report_pdf as report_pdf
 from expense_splitter.report_pdf import (
+    PdfChartSpec,
     PdfTableSpec,
+    _chart_layout_mode,
     _column_widths_for_table,
     _format_kpi_value,
     _format_pdf_table_cell,
@@ -31,9 +33,24 @@ def test_compact_purchase_rows_hide_service_fields_and_count_participants():
     compact = report_pdf._compact_purchase_rows(rows)
 
     assert compact == [
-        ["Дата", "Покупка", "Категория", "Сумма", "Плательщик", "Участников"],
+        ["Дата", "Покупка", "Категория", "Сумма", "Плательщик", "Участники"],
         ["2026-06-30", "Кофе", "Еда", "100.00", "Alice", "Alice, Bob"],
     ]
+
+
+def test_two_remaining_charts_use_vertical_full_width_stack(tmp_path):
+    charts = [
+        PdfChartSpec("spending_by_payer", "Расходы по плательщикам", tmp_path / "a.png"),
+        PdfChartSpec("top_purchases", "Крупнейшие покупки", tmp_path / "b.png"),
+    ]
+
+    assert _chart_layout_mode(charts) == "vertical_stack_full_width"
+
+
+def test_four_charts_keep_two_by_two_grid(tmp_path):
+    charts = [PdfChartSpec(str(index), str(index), tmp_path / f"{index}.png") for index in range(4)]
+
+    assert _chart_layout_mode(charts) == "two_by_two"
 
 
 def test_summary_is_split_into_context_and_kpis():
@@ -80,6 +97,18 @@ def test_balance_table_reserves_single_line_width_for_first_headers():
 
     assert widths == pytest.approx([64.8, 61.2, 108.0, 126.0])
     assert sum(widths) == pytest.approx(width)
+
+
+def test_purchase_table_reserves_width_for_wrapped_participant_names():
+    width = 600
+    rows = [
+        ["Дата", "Покупка", "Категория", "Сумма", "Плательщик", "Участники"],
+        ["2026-08-01", "Арбуз", "Еда", "1200", "Сергей", "Павел, Сергей, Владимир, Максим, Елена"],
+    ]
+
+    widths = _column_widths_for_table(rows, width, "purchases.csv")
+
+    assert widths == pytest.approx([72, 132, 90, 60, 72, 174])
 
 
 def test_pdf_money_values_round_up_without_decimal_fraction():

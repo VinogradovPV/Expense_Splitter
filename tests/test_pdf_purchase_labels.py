@@ -6,11 +6,12 @@ from expense_splitter.report_pdf import _compact_purchase_rows
 from expense_splitter.report_tables import (
     PURCHASE_LABEL_MAX_LENGTH,
     compact_participant_list,
+    full_participant_list,
     truncate_display_label,
 )
 
 
-def test_compact_purchase_table_keeps_real_names_and_compacts_participants():
+def test_compact_purchase_table_keeps_all_real_participant_names():
     rows = [
         ["Дата", "Покупка", "Категория", "Сумма", "Плательщик", "Участники"],
         [
@@ -27,7 +28,8 @@ def test_compact_purchase_table_keeps_real_names_and_compacts_participants():
 
     assert compact[1][1] == "Арбуз Астрахань"
     assert compact[1][4] == "Павел"
-    assert compact[1][5] == "Павел, Сергей, Владимир и еще 4"
+    assert compact[1][5] == "Павел, Сергей, Владимир, Елена, Эмилия, Мария, Максим"
+    assert "и еще" not in compact[1][5]
 
 
 def test_long_label_truncation_preserves_source_prefix():
@@ -39,6 +41,9 @@ def test_long_label_truncation_preserves_source_prefix():
     assert compact.endswith("…")
     assert len(compact) <= PURCHASE_LABEL_MAX_LENGTH
     assert compact_participant_list("") == "Без имени"
+    assert full_participant_list("Павел, Сергей, Владимир, Максим, Елена") == (
+        "Павел, Сергей, Владимир, Максим, Елена"
+    )
 
 
 def test_current_top_purchases_chart_uses_real_or_truncated_purchase_names(

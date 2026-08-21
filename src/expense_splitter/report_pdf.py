@@ -9,7 +9,7 @@ from typing import Any, Literal, Sequence
 from expense_splitter.report_tables import (
     PARTICIPANT_LABEL_MAX_LENGTH,
     PURCHASE_LABEL_MAX_LENGTH,
-    compact_participant_list,
+    full_participant_list,
     rows_for_visual_table,
     truncate_display_label,
     visual_table_note,
@@ -482,10 +482,56 @@ def _chart_grid(charts, styles, width, height, tools) -> list[object]:
                 [tools["PageBreak"](), tools["Paragraph"]("Графики", styles["Heading2"])]
             )
         page_charts = charts[page_start : page_start + 4]
-        if len(page_charts) == 1:
+        layout_mode = _chart_layout_mode(page_charts)
+        if layout_mode == "single_full_width":
             result.append(
                 _chart_card(page_charts[0], styles, width, height * 0.72, tools)
             )
+            continue
+        if layout_mode == "vertical_stack_full_width":
+            rows = [
+                [_chart_card(chart, styles, width * 0.96, height * 0.36, tools)]
+                for chart in page_charts
+            ]
+            grid = tools["Table"](rows, colWidths=[width])
+            grid.setStyle(
+                tools["TableStyle"](
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                        ("TOPPADDING", (0, 0), (-1, -1), 2),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ]
+                )
+            )
+            result.append(grid)
+            continue
+        if layout_mode == "two_up_one_full_width":
+            rows = [
+                [
+                    _chart_card(page_charts[0], styles, width * 0.48, height * 0.30, tools),
+                    _chart_card(page_charts[1], styles, width * 0.48, height * 0.30, tools),
+                ],
+                [
+                    _chart_card(page_charts[2], styles, width * 0.96, height * 0.34, tools),
+                    "",
+                ],
+            ]
+            grid = tools["Table"](rows, colWidths=[width * 0.49, width * 0.49])
+            grid.setStyle(
+                tools["TableStyle"](
+                    [
+                        ("SPAN", (0, 1), (1, 1)),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                        ("TOPPADDING", (0, 0), (-1, -1), 2),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ]
+                )
+            )
+            result.append(grid)
             continue
         rows, spans, pending = [], [], []
         for chart in page_charts:
@@ -520,6 +566,18 @@ def _chart_grid(charts, styles, width, height, tools) -> list[object]:
         )
         result.append(grid)
     return result
+
+
+def _chart_layout_mode(charts: Sequence[PdfChartSpec]) -> str:
+    """Choose a readable page layout before creating ReportLab flowables."""
+    count = len(charts)
+    if count == 1:
+        return "single_full_width"
+    if count == 2:
+        return "vertical_stack_full_width"
+    if count == 3:
+        return "two_up_one_full_width"
+    return "two_by_two"
 
 
 def _chart_card(chart, styles, max_width, max_height, tools):
@@ -657,15 +715,13 @@ def _compact_purchase_rows(rows: Sequence[Sequence[str]]) -> list[list[str]]:
         "Участники",
     }
     indexes = [index for index, header in enumerate(headers) if header in wanted]
-    result = [
-        [headers[index] if headers[index] != "Участники" else "Участников" for index in indexes]
-    ]
+    result = [[headers[index] for index in indexes]]
     for row in rows[1 : PDF_MAIN_PURCHASE_ROWS_LIMIT + 1]:
         compact = []
         for index in indexes:
             value = row[index] if index < len(row) else ""
             if headers[index] == "Участники":
-                value = compact_participant_list(value)
+                value = full_participant_list(value)
             elif headers[index] in {"Покупка", "Наименование покупки"}:
                 value = truncate_display_label(value, PURCHASE_LABEL_MAX_LENGTH, "н/д")
             elif headers[index] == "Плательщик":
@@ -723,6 +779,8 @@ def _column_widths_for_table(
 ) -> list[float]:
     if Path(filename or "").name == "balances.csv" and max(map(len, rows), default=0) == 4:
         return [width * ratio for ratio in (0.18, 0.17, 0.30, 0.35)]
+    if Path(filename or "").name == "purchases.csv" and max(map(len, rows), default=0) == 6:
+        return [width * ratio for ratio in (0.12, 0.22, 0.15, 0.10, 0.12, 0.29)]
     return _column_widths(rows, width)
 
 

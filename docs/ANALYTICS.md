@@ -170,12 +170,15 @@ considered a defect. Chart sections use Russian user-facing titles, while intern
 only in filenames and metadata. Non-negative expense charts start their X scale at zero; the balance
 chart may use negative values and the balance table includes an explanation of the sign.
 
-The compact A4 landscape layout uses KPI cards, two-column table sections and a 2x2 chart grid.
+The compact A4 landscape layout uses KPI cards, two-column table sections and an adaptive chart
+grid: four compact charts use 2x2, while two remaining charts are stacked at full width.
 The main analytics pages no longer repeat the summary table or print every purchase. Full purchase
 detail is rendered in `Приложение: все покупки` and remains unchanged in CSV/XLSX.
-Participant, payer, category and purchase labels are sourced from the real report dataset. Compact
-chart labels may be truncated with an ellipsis, while the analytics appendix preserves the full
-purchase name and participant list. There is no implicit runtime anonymization.
+Participant, payer, category and purchase labels are sourced from the real report dataset. Every
+PDF purchase row preserves the complete participant list and wraps it inside the cell without
+`и еще N` or `+N`. Compact chart labels may be truncated with an ellipsis, while the analytics
+appendix preserves the full purchase name and participant list. There is no implicit runtime
+anonymization.
 PDF monetary values are shown as whole numbers rounded upward; precise calculated values remain
 available in CSV and XLSX. Percentages and counts are not rounded by this display rule.
 

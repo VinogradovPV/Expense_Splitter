@@ -59,6 +59,12 @@ def compact_participant_list(value: object, visible_count: int = 3) -> str:
     return ", ".join(visible) + suffix
 
 
+def full_participant_list(value: object) -> str:
+    """Preserve every participant name for PDF purchase tables."""
+    names = [name.strip() for name in str(value or "").split(",") if name.strip()]
+    return ", ".join(names) if names else "Без имени"
+
+
 def rows_for_visual_table(filename: str | Path, rows: Sequence[Sequence[str]]) -> list[list[str]]:
     """Remove machine-only purchase columns from user-facing table renderers."""
     name = Path(filename).name

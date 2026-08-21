@@ -287,13 +287,14 @@ metadata, expense charts start from zero, and the balance table explains the sig
 balance.
 
 PDF uses a compact A4 landscape layout: the first page shows KPI cards, short tables share a
-two-column grid, and charts are grouped up to four per page. Analytics keeps the full purchases
+two-column grid, and charts are grouped adaptively. Four compact charts use a 2x2 grid; two
+remaining charts use a vertical full-width stack. Analytics keeps the full purchases
 table in `Приложение: все покупки`; current and settlement reports add the appendix only above the
 main-table limit. CSV and XLSX continue to contain the complete detail.
-Participant, payer and purchase labels always come from report data. Compact tables and charts may
-shorten long labels with an ellipsis, but never replace them with numbered surrogate names.
-Current-report shows up to three real participant names followed by `и еще N`; analytics appendix,
-CSV and XLSX retain the full participant list. Runtime report anonymization is not enabled.
+Participant, payer and purchase labels always come from report data. Purchase tables in every PDF
+list all participants and wrap long lists inside the cell; they do not use `и еще N` or `+N`.
+Compact chart labels may shorten long labels with an ellipsis, but never replace them with numbered
+surrogate names. CSV and XLSX retain the full detail. Runtime report anonymization is not enabled.
 PDF monetary values are displayed as whole numbers rounded upward. Calculations and precise values
 in CSV/XLSX remain unchanged.
 
