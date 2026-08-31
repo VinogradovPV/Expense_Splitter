@@ -1324,3 +1324,132 @@ outside-sandbox запуска проверок в текущем API-сеанс
 Не удалять, не пересоздавать и не публиковать tags/releases автоматически. Перед финальной
 release-процедурой нужно отдельное решение пользователя по существующему `v0.1.1`. Перед commit
 TG-PREP.1 нужно выполнить полный quality gate, потому что изменен `pyproject.toml`.
+
+## P2.RPT.5 — Улучшение PDF-отчетов, подписей и графиков
+
+Дата: 2026-07-03
+Статус: implemented locally on `cloud/telegram-prep`; full quality gate passed. Pytest and pip
+install were run outside sandbox because sandbox temp-dir ACL blocked `tmp_path`/pip temp dirs.
+
+### Что исправлено
+
+| Область | Изменение |
+|---|---|
+| PDF layout | Табличные секции собираются через общий block builder с `KeepTogether`; заголовок таблицы удерживается вместе с таблицей |
+| PDF pages | Убран безусловный `PageBreak` перед графиками; пустые страницы считаются дефектом |
+| Visual labels | `by_participant` показывает `Объем расходов на человека`; `balances` показывает `Объем расходов на человека` и `Итог: + получит, − должен` |
+| Balance explanation | PDF/HTML/Markdown добавляют пояснение знака итогового баланса |
+| Chart titles | Internal chart keys не выводятся пользователю; используются русские заголовки |
+| Chart axes | Расходные графики получают X scale from zero с правым запасом; balance chart сохраняет отрицательную область |
+| Period trend | Если дат меньше двух, `period_trend` не строится и выводится понятное предупреждение |
+| Period trend policy | `period_trend` использует дневную агрегацию, единое правило skip/build и manifest текущего запуска для PDF/ReportService |
+| Skipped trend warning | Local/GUI/CLI и ReportService показывают `Недостаточно дат для построения динамики расходов.` при пропуске `period_trend` |
+| Current operations chart | Current-report строит `Операции по дням` при минимум двух уникальных датах и агрегирует несколько покупок одного дня |
+| Stale PNG protection | Аналитический отчет очищает известные chart-файлы перед генерацией и не включает старые PNG в `ReportResult.files` |
+| Warnings | Пустой visual-раздел предупреждений показывает `Предупреждений нет.` |
+| Analytics summary | Raw period values `month/quarter/year` заменены пользовательскими русскими подписями в visual summary |
+
+### Проверки
+
+- `python -m pip install -e ".[dev]"`: OK outside sandbox.
+- Focused PDF/report tests: 23 passed outside sandbox.
+- `python -m pytest tests -v`: 234 passed outside sandbox.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+
+Manual smoke generated analytics/current/settlement PDF files under `.tmp/p2_rpt5_smoke_20260703`.
+Poppler is not available in the local environment, so PNG rendering of PDF pages was not performed.
+
+## P2.RPT.7 — Редизайн PDF-отчетов и компактная layout-система
+
+Дата: 2026-08-17
+Статус: implemented on `cloud/telegram-prep`; full quality gate passed.
+
+### Что изменено
+
+| Область | Изменение |
+|---|---|
+| Layout layer | Добавлены общие design tokens, KPI grid, table cards, two-column sections, chart grid, appendix и typed report manifest |
+| Summary | PDF показывает KPI-карточки и контекст периода без дублирующей таблицы `summary.csv` |
+| Tables | Короткие и финансовые таблицы используют компактные карточки; суммы выравниваются вправо |
+| Purchases | Основная таблица сокращена до пользовательских колонок и количества участников |
+| Analytics appendix | Полная таблица покупок вынесена в `Приложение: все покупки` |
+| Current/settlement appendix | Приложение добавляется при превышении лимита 15 покупок |
+| Charts | Порядок задается manifest текущего запуска; до четырех графиков размещаются на странице |
+| Warnings | Пустое состояние и предупреждения выводятся как компактный callout |
+
+Расчет долгов, settlement semantics, YAML/offline mode и структура CSV/XLSX не изменялись.
+
+### Проверки
+
+- Focused PDF/layout tests: 15 passed.
+- Full suite: 258 passed.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+- Manual smoke: current-report — 4 страницы; analytics — 4 основные страницы + appendix
+  (8 страниц всего для 63 покупок). Все проверенные страницы непустые, визуальный PNG-review — OK.
+
+## P2.RPT.7.1 — Реальные имена и названия в redesigned PDF
+
+Дата: 2026-08-17
+Статус: implemented on `cloud/telegram-prep`; full quality gate passed.
+
+### Причина и исправление
+
+Production report datasets и renderers не содержали runtime anonymization: суррогаты
+`Участник N` и `Покупка N` находились в synthetic fixtures предыдущего smoke/test. Fixtures для
+PDF regression заменены на реальные русские display names и purchase names. Дополнительно общий
+visual layer теперь гарантирует, что compact labels сохраняют начало исходного значения и только
+сокращаются многоточием.
+
+| Область | Изменение |
+|---|---|
+| Current tables | Реальные payer/participant/purchase labels; до трех имен + `и еще N` |
+| Wide purchase table | Режим `full` занимает всю строку, поэтому реальные названия остаются читаемыми |
+| Charts | Реальные participant/payer/purchase labels; предел 24/32 символа с многоточием |
+| Analytics appendix | Полные purchase name, payer, participants, category, amount и date без сокращения |
+| Missing values | `Без имени` для отсутствующего participant label, `н/д` для отсутствующего purchase name |
+| Anonymization | Не используется в production report path; synthetic labels допустимы только в fixtures |
+
+### Проверки
+
+- Focused PDF/label tests: 40 passed.
+- Full suite: 263 passed.
+- `python -m compileall -q src tests`: OK.
+- `scripts/qa/check_text_encoding.py`: OK.
+- `python -m ruff check src tests`: OK.
+- `git diff --check`: OK.
+- Manual smoke: current-report — 4 страницы; analytics — 7 страниц с appendix. Все страницы
+  непустые, семь реальных имен присутствуют, surrogate regex отсутствует, визуальный PNG-review — OK.
+
+### PDF display hotfix — 2026-08-18
+
+- Для `balances.csv` закреплены пропорции колонок 18/17/30/35%, поэтому заголовки `Участник` и
+  `Оплачено` помещаются в одну строку.
+- Денежные значения в KPI, PDF-таблицах и подписях графиков отображаются целыми числами с
+  математическим округлением вверх.
+- Проценты, количества и даты не затрагиваются; расчеты и точные CSV/XLSX значения не изменены.
+
+## P2.RPT.7.2 — Полные участники и адаптивная компоновка графиков
+
+Дата: 2026-08-21
+Статус: implemented on `cloud/telegram-prep`; full quality gate passed.
+
+- Таблицы покупок current, analytics и settlement PDF показывают полный список реальных имен;
+  длинные списки переносятся внутри ячейки без `и еще N` и `+N`.
+- Колонке `Участники` выделено 29% ширины шестиколоночной основной таблицы покупок.
+- Два оставшихся на странице графика располагаются вертикально на всю ширину; четыре компактных
+  графика сохраняют сетку 2x2, три используют схему 2+1, один занимает всю ширину.
+- Расчеты, settlement semantics и форматы HTML/XLSX/CSV/Markdown не изменены.
+
+### Проверки
+
+- Focused PDF/layout tests: 42 passed.
+- Full suite: 268 passed.
+- `python -m compileall -q src tests`, UTF-8 check, Ruff и `git diff --check`: OK.
+- Manual smoke: current-report — 4 непустые страницы; полные имена присутствуют без сокращений,
+  два последних графика расположены вертикально на всю ширину; визуальный PNG-review — OK.

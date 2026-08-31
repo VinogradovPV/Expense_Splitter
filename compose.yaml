@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: expense-splitter-backend:local
+    ports:
+      - "${EXPENSE_SPLITTER_PORT:-8000}:8000"
+    environment:
+      EXPENSE_SPLITTER_DATA_DIR: /app/data
+      EXPENSE_SPLITTER_REPORTS_DIR: /app/reports/server
+      EXPENSE_SPLITTER_TENANT_ID: "${EXPENSE_SPLITTER_TENANT_ID:-local}"
+      EXPENSE_SPLITTER_REPOSITORY: "${EXPENSE_SPLITTER_REPOSITORY:-yaml}"
+      EXPENSE_SPLITTER_REPORT_STORAGE: "${EXPENSE_SPLITTER_REPORT_STORAGE:-temp}"
+      EXPENSE_SPLITTER_OBJECT_PREFIX: "${EXPENSE_SPLITTER_OBJECT_PREFIX:-reports}"
+      YANDEX_OBJECT_STORAGE_BUCKET: "${YANDEX_OBJECT_STORAGE_BUCKET:-}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql+psycopg://expense_splitter:change_me_local_only@postgres:5432/expense_splitter}"
+    volumes:
+      - ./data:/app/data
+      - ./reports/server:/app/reports/server
+
+  postgres:
+    image: postgres:16-alpine
+    profiles:
+      - postgres
+    environment:
+      POSTGRES_DB: expense_splitter
+      POSTGRES_USER: expense_splitter
+      POSTGRES_PASSWORD: change_me_local_only
+    ports:
+      - "${EXPENSE_SPLITTER_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

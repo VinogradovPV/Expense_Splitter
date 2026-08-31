@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Sequence
 
 from expense_splitter.analytics import AnalyticsDataset
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    chart_display_title,
+    rows_for_visual_table,
+    visual_table_note,
+)
 
 TABLES = (
     ("summary.csv", "Сводка"),
@@ -21,12 +25,13 @@ TABLES = (
     ("top_purchases.csv", "Крупнейшие покупки"),
     ("warnings.csv", "Предупреждения"),
 )
+DISPLAY_TABLES = tuple(item for item in TABLES if item[0] != "warnings.csv")
 
 CHARTS = (
     ("spending_by_category.png", "Расходы по категориям"),
     ("spending_by_payer.png", "Расходы по плательщикам"),
     ("participant_share.png", chart_display_title("participant_share.png")),
-    ("balances.png", "Итоговые балансы"),
+    ("balances.png", chart_display_title("balances.png")),
     ("period_trend.png", "Динамика расходов"),
     ("top_purchases.png", "Крупнейшие покупки"),
 )
@@ -60,6 +65,7 @@ def write_html_report(
     dataset: AnalyticsDataset,
     path: Path,
     warnings: Sequence[dict[str, object]],
+    chart_paths: Sequence[Path] = (),
 ) -> Path:
     summary = dataset.summary
     generated_at = datetime.now(timezone.utc).astimezone().strftime("%d.%m.%Y %H:%M %Z")
@@ -81,8 +87,15 @@ def write_html_report(
         f"<strong>{escape(value)}</strong></div>"
         for label, value in cards
     )
-    table_html = "".join(_table_section(path.parent, filename, title) for filename, title in TABLES)
-    chart_html = "".join(_chart_section(path.parent, filename, title) for filename, title in CHARTS)
+    table_html = "".join(
+        _table_section(path.parent, filename, title) for filename, title in DISPLAY_TABLES
+    )
+    generated_chart_names = {chart_path.name for chart_path in chart_paths}
+    chart_html = "".join(
+        _chart_section(path.parent, filename, title)
+        for filename, title in CHARTS
+        if filename in generated_chart_names
+    )
     csv_links = "".join(
         f'<a href="tables/{escape(filename)}">{escape(title)} CSV</a>' for filename, title in TABLES
     )
@@ -131,6 +144,9 @@ def _table_section(report_dir: Path, filename: str, title: str) -> str:
             for row in rows[1:]
         )
         body = f"<table><thead><tr>{header}</tr></thead><tbody>{data}</tbody></table>"
+    note = visual_table_note(filename)
+    if note:
+        body += f'<p class="muted">{escape(note)}</p>'
     return f'<article class="panel"><h3>{escape(title)}</h3>{body}</article>'
 
 

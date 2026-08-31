@@ -280,6 +280,25 @@ PDF is available for:
 Use `--format pdf` to create only PDF or `--format all` to include PDF with the existing
 Markdown, CSV, PNG, HTML and XLSX outputs.
 
+PDF reports keep table section headings with the table header and first data row, so a heading
+does not remain alone at the bottom of a page. Empty PDF pages are treated as a report defect.
+Visual report labels are user-facing Russian text: internal chart keys stay in filenames and
+metadata, expense charts start from zero, and the balance table explains the sign of the final
+balance.
+
+PDF uses a compact A4 landscape layout: the first page shows KPI cards, short tables share a
+two-column grid, and charts are grouped adaptively. Four compact charts use a 2x2 grid; two
+remaining charts use a vertical full-width stack. Analytics keeps the full purchases
+table in `Приложение: все покупки`; current and settlement reports add the appendix only above the
+main-table limit. CSV and XLSX continue to contain the complete detail.
+Participant, payer and purchase labels always come from report data. Purchase tables in every PDF
+list all participants and wrap long lists inside the cell; they do not use `и еще N` or `+N`.
+Compact chart labels may shorten long labels with an ellipsis, but never replace them with numbered
+surrogate names. CSV and XLSX retain the full detail. Runtime report anonymization is not enabled.
+PDF monetary values use a space as the thousands separator, a comma as the decimal separator and
+always show two decimal places (for example, `1 567,28`). This matches CSV/XLSX precision; report
+formatting does not change calculations or stored values.
+
 Purchase tables in all report formats use the same business sorting: payers are ordered by
 `payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by
 amount descending, date descending, purchase name ascending and id ascending. CSV purchases tables

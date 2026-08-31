@@ -46,12 +46,20 @@ reports/current_state/open_<YYYY-MM-DD_HH-MM-SS>/
 │   ├── settlements.csv
 │   └── warnings.csv
 └── charts/
+    ├── balances.png
+    ├── participant_share.png
+    ├── operations_by_day.png  # только если есть минимум две уникальные даты
     ├── spending_by_category.png
     ├── spending_by_payer.png
-    ├── participant_share.png
-    ├── balances.png
     └── top_purchases.png
 ```
+
+Current-report строит график `operations_by_day.png` с пользовательским названием `Операции по
+дням`, если в выбранном scope есть минимум две уникальные даты покупок. Несколько покупок в один
+день агрегируются в дневную сумму. Если уникальная дата одна, график не создается, а отчет
+показывает предупреждение `Недостаточно дат для построения графика операций по дням.`. PDF, HTML,
+XLSX и ReportService используют только графики текущего запуска, поэтому старый
+`operations_by_day.png` не попадает в новый отчет.
 
 ## Исторический отчет settlement period
 
@@ -80,6 +88,7 @@ expense-splitter settlement-period report settlement_2026_06_30_001 --format xls
 - `png` — статические графики;
 - `html` — offline dashboard с embedded CSS и локальными PNG;
 - `xlsx` — Excel-книга через `openpyxl`, без COM и установленного Excel;
+- `pdf` — нативный PDF через ReportLab;
 - `all` — все форматы и `metadata.json`.
 
 ## Структура output
@@ -105,7 +114,7 @@ reports/analytics/<year>/<period-id>/
     ├── spending_by_payer.png
     ├── participant_share.png
     ├── balances.png
-    ├── period_trend.png
+    ├── period_trend.png  # только если есть минимум две уникальные даты
     └── top_purchases.png
 ```
 
@@ -113,7 +122,15 @@ reports/analytics/<year>/<period-id>/
 
 Таблицы строятся из единого `AnalyticsDataset`; расчётная логика не дублируется в renderers.
 `warnings.csv` содержит покупки без даты и причины отсутствия графиков. Если данных нет, пустые
-графики не создаются, а HTML/XLSX показывают понятное сообщение.
+графики не создаются.
+
+График `period_trend.png` строится только при минимум двух уникальных датах покупок. Несколько
+покупок в один день агрегируются в дневную сумму, например `619.00 + 550.00 = 1169.00`. Если
+уникальная дата одна, график динамики пропускается, в warnings добавляется
+`chart_not_enough_data`, а `period_trend` не попадает в `metadata.files`, `charts_generated`, PDF,
+HTML, XLSX и delivery result. Local CLI, GUI и ReportService используют один и тот же chart policy:
+пользователь видит предупреждение `Недостаточно дат для построения динамики расходов.`, а не
+сообщение `Предупреждений нет.`.
 
 В таблице `Расходы по плательщикам` для analytics, current-report и settlement-period report есть
 колонка `Доля оплат, %`. Она показывает `оплачено плательщиком / общая сумма отчета * 100`, с
@@ -148,6 +165,24 @@ expense-splitter analytics --period year --year 2026 --format pdf
 
 The file is saved as `reports/analytics/<year>/<period-id>/expense_analytics_<period-id>.pdf`.
 PDF is generated natively with ReportLab and local fonts; it is not browser print output.
+PDF layout keeps table headings together with the table header and first data row; empty pages are
+considered a defect. Chart sections use Russian user-facing titles, while internal chart keys remain
+only in filenames and metadata. Non-negative expense charts start their X scale at zero; the balance
+chart may use negative values and the balance table includes an explanation of the sign.
+
+The compact A4 landscape layout uses KPI cards, two-column table sections and an adaptive chart
+grid: four compact charts use 2x2, while two remaining charts are stacked at full width.
+The main analytics pages no longer repeat the summary table or print every purchase. Full purchase
+detail is rendered in `Приложение: все покупки` and remains unchanged in CSV/XLSX.
+Participant, payer, category and purchase labels are sourced from the real report dataset. Every
+PDF purchase row preserves the complete participant list and wraps it inside the cell without
+`и еще N` or `+N`. Compact chart labels may be truncated with an ellipsis, while the analytics
+appendix preserves the full purchase name and participant list. There is no implicit runtime
+anonymization.
+PDF monetary values always show two decimal places with a comma decimal separator, for example
+`1 567,28`. PDF and XLSX therefore use the same monetary precision; calculation logic and CSV/XLSX
+values are unchanged. Percentages use their own two-decimal format, and counts are not formatted
+as money.
 
 The purchases table is sorted by payer total descending, then by purchase amount descending inside
 each payer. CSV adds `payer_total` and `payer_rank` so the grouping remains machine-readable.

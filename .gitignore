@@ -7,15 +7,22 @@ __pycache__/
 .mypy_cache/
 dist/
 build/
-reports/analytics/
+/reports/analytics/
 *.egg-info/
 .env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+service-account*.json
+telegram_token*.txt
 *.tmp
 *.bak
 ~$*.xlsx
 
 # Generated reports
-reports/
+/reports/
 
 # Local user data
 data/*.yaml
