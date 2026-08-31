@@ -111,9 +111,9 @@ def test_purchase_table_reserves_width_for_wrapped_participant_names():
     assert widths == pytest.approx([72, 132, 90, 60, 72, 174])
 
 
-def test_pdf_money_values_round_up_without_decimal_fraction():
-    assert _format_pdf_table_cell("10378.67", "Оплачено") == "10 379"
-    assert _format_pdf_table_cell("-2998.02", "Итог: + получит, − должен") == "-2 998"
-    assert _format_pdf_table_cell("15.39", "Доля оплат, %") == "15.39"
-    assert _format_kpi_value(1200.01, "Общая сумма") == "1 201"
+def test_pdf_money_values_preserve_two_decimal_places():
+    assert _format_pdf_table_cell("10378.67", "Оплачено") == "10 378,67"
+    assert _format_pdf_table_cell("-2998.02", "Итог: + получит, − должен") == "-2 998,02"
+    assert _format_pdf_table_cell("15.39", "Доля оплат, %") == "15,39"
+    assert _format_kpi_value(1200.01, "Общая сумма") == "1 200,01"
     assert _format_kpi_value(63, "Покупок") == "63"

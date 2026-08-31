@@ -196,8 +196,8 @@ def test_empty_dataset_returns_warnings_instead_of_failing(tmp_path):
 
 
 def test_chart_data_labels_use_readable_money_format():
-    assert _format_chart_value(1200.5) == "1 201"
-    assert _format_chart_value(-25.2) == "-25"
+    assert _format_chart_value(1200.5) == "1 200,50"
+    assert _format_chart_value(-25.2) == "-25,20"
 
 
 def test_non_negative_x_axis_starts_at_zero_with_right_padding():

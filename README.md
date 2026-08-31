@@ -295,8 +295,9 @@ Participant, payer and purchase labels always come from report data. Purchase ta
 list all participants and wrap long lists inside the cell; they do not use `и еще N` or `+N`.
 Compact chart labels may shorten long labels with an ellipsis, but never replace them with numbered
 surrogate names. CSV and XLSX retain the full detail. Runtime report anonymization is not enabled.
-PDF monetary values are displayed as whole numbers rounded upward. Calculations and precise values
-in CSV/XLSX remain unchanged.
+PDF monetary values use a space as the thousands separator, a comma as the decimal separator and
+always show two decimal places (for example, `1 567,28`). This matches CSV/XLSX precision; report
+formatting does not change calculations or stored values.
 
 Purchase tables in all report formats use the same business sorting: payers are ordered by
 `payer_total` descending, then payer name ascending. Purchases inside each payer are ordered by

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import ceil
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from expense_splitter.analytics import AnalyticsDataset, aggregate_daily_spending
+from expense_splitter.report_formatting import format_money_for_pdf
 from expense_splitter.report_tables import (
     BALANCE_CHART_TITLE,
     BALANCE_CHART_XLABEL,
@@ -166,7 +166,7 @@ def set_non_negative_x_axis(ax, values: list[float]) -> None:
 
 
 def _format_chart_value(value: float) -> str:
-    return f"{ceil(value):,}".replace(",", " ")
+    return format_money_for_pdf(value)
 
 
 def _line_label_offset(index: int, values: list[float]) -> tuple[int, int, str]:

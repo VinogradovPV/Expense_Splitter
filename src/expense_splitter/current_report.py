@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from html import escape
-from math import ceil
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -35,6 +34,7 @@ from expense_splitter.models import (
     Purchase,
     Settlement,
 )
+from expense_splitter.report_formatting import format_money_for_pdf
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
 from expense_splitter.report_tables import (
@@ -1060,7 +1060,7 @@ def set_non_negative_x_axis(ax, values: Sequence[float]) -> None:
 
 
 def _format_money(value: float) -> str:
-    return f"{ceil(value):,}".replace(",", " ")
+    return format_money_for_pdf(value)
 
 
 def _line_label_offset(index: int, values: Sequence[float]) -> tuple[int, int, str]:

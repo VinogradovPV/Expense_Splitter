@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from expense_splitter.report_formatting import (
+    format_money_for_pdf,
+    format_pdf_cell,
+    is_money_pdf_label,
+    serialize_pdf_value,
+)
 from expense_splitter.report_tables import (
     PARTICIPANT_LABEL_MAX_LENGTH,
     PURCHASE_LABEL_MAX_LENGTH,
@@ -18,15 +24,6 @@ from expense_splitter.report_tables import (
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
 PDF_MAIN_PURCHASE_ROWS_LIMIT = 15
-PDF_MONEY_HEADERS = {
-    "Сумма",
-    "Оплачено",
-    "Доля расходов",
-    "Объем расходов на человека",
-    "Баланс",
-    "Итоговый баланс",
-    "Итог: + получит, − должен",
-}
 FONT_CANDIDATES = (
     Path(r"C:\Windows\Fonts\arial.ttf"),
     Path(r"C:\Windows\Fonts\segoeui.ttf"),
@@ -804,35 +801,19 @@ def _chart_title(filename: str) -> str:
 
 
 def _serialize(value: object) -> str:
-    if isinstance(value, Decimal):
-        return f"{value:.2f}"
-    if isinstance(value, (list, tuple)):
-        return ", ".join(str(item) for item in value)
-    return "" if value is None else str(value)
+    return serialize_pdf_value(value)
 
 
 def _format_pdf_table_cell(value: object, header: str, is_header: bool = False) -> str:
-    if not is_header and header in PDF_MONEY_HEADERS:
-        return _format_pdf_amount(value)
-    return _serialize(value)
+    return format_pdf_cell(value, header, is_header=is_header)
 
 
 def _format_pdf_amount(value: object) -> str:
-    raw = str(value).strip().replace(" ", "")
-    try:
-        amount = Decimal(raw)
-    except (InvalidOperation, ValueError):
-        return _serialize(value)
-    rounded = amount.to_integral_value(rounding=ROUND_CEILING)
-    return f"{rounded:,.0f}".replace(",", " ")
+    return format_money_for_pdf(value)
 
 
 def _is_money_label(label: str) -> bool:
-    normalized = label.casefold()
-    return any(
-        marker in normalized
-        for marker in ("сумма", "средний чек", "средняя покупка")
-    )
+    return is_money_pdf_label(label)
 
 
 def _is_numeric(value: object) -> bool:

@@ -179,8 +179,10 @@ PDF purchase row preserves the complete participant list and wraps it inside the
 `и еще N` or `+N`. Compact chart labels may be truncated with an ellipsis, while the analytics
 appendix preserves the full purchase name and participant list. There is no implicit runtime
 anonymization.
-PDF monetary values are shown as whole numbers rounded upward; precise calculated values remain
-available in CSV and XLSX. Percentages and counts are not rounded by this display rule.
+PDF monetary values always show two decimal places with a comma decimal separator, for example
+`1 567,28`. PDF and XLSX therefore use the same monetary precision; calculation logic and CSV/XLSX
+values are unchanged. Percentages use their own two-decimal format, and counts are not formatted
+as money.
 
 The purchases table is sorted by payer total descending, then by purchase amount descending inside
 each payer. CSV adds `payer_total` and `payer_rank` so the grouping remains machine-readable.
