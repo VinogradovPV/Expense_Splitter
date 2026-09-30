@@ -24,6 +24,12 @@ from expense_splitter.report_tables import (
 CSV_ENCODING = "utf-8-sig"
 FONT_NAME = "ExpenseSplitterSans"
 PDF_MAIN_PURCHASE_ROWS_LIMIT = 15
+PDF_TWO_COLUMN_MAX_ROWS = 8
+PDF_TWO_COLUMN_MAX_HEIGHT_RATIO = 0.45
+PDF_LAYOUT_ERROR_MESSAGE = (
+    "PDF-отчет не удалось сформировать из-за ошибки верстки. "
+    "Попробуйте создать HTML/XLSX или обновите отчет после исправления."
+)
 FONT_CANDIDATES = (
     Path(r"C:\Windows\Fonts\arial.ttf"),
     Path(r"C:\Windows\Fonts\segoeui.ttf"),
@@ -116,6 +122,7 @@ def _load_reportlab_layout_tools() -> dict[str, Any]:
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import (
+        CondPageBreak,
         Image,
         KeepTogether,
         PageBreak,
@@ -128,6 +135,7 @@ def _load_reportlab_layout_tools() -> dict[str, Any]:
 
     return {
         "A4": A4,
+        "CondPageBreak": CondPageBreak,
         "Image": Image,
         "KeepTogether": KeepTogether,
         "PageBreak": PageBreak,
@@ -197,7 +205,9 @@ def write_pdf_report(
             continue
         if rendered_section:
             story.append(tools["PageBreak"]())
-        story.extend(_table_grid(specs, table_data, styles, doc.width, tools, tokens))
+        story.extend(
+            _table_grid(specs, table_data, styles, doc.width, doc.height, tools, tokens)
+        )
         rendered_section = True
 
     if manifest.charts:
@@ -380,50 +390,59 @@ def _format_kpi_value(value: object, label: str = "") -> str:
     return _serialize(value)
 
 
-def _table_grid(specs, table_data, styles, width, tools, tokens) -> list[object]:
-    rows, spans, pending = [], [], []
-    for spec in specs:
-        if spec.display_mode == "full":
-            if pending:
-                rows.append([pending[0], ""])
-                pending = []
-            row_index = len(rows)
-            rows.append(
-                [
-                    _table_card(
-                        spec,
-                        table_data.get(spec.filename, []),
-                        styles,
-                        width * 0.96,
-                        tools,
-                        tokens,
-                    ),
-                    "",
-                ]
-            )
-            spans.append(("SPAN", (0, row_index), (1, row_index)))
-            continue
-        pending.append(
-            _table_card(
-                spec,
-                table_data.get(spec.filename, []),
-                styles,
-                width * 0.48,
-                tools,
-                tokens,
-            )
-        )
-        if len(pending) == 2:
-            rows.append(pending)
-            pending = []
-    if pending:
-        rows.append([pending[0], ""])
+def flowable_fits(flowable, available_width: float, available_height: float) -> bool:
+    """Return whether a ReportLab flowable fits inside the supplied frame."""
+    _, wrapped_height = flowable.wrap(available_width, available_height)
+    return wrapped_height <= available_height
 
-    grid = tools["Table"](rows, colWidths=[width * 0.49, width * 0.49])
+
+def _table_grid(specs, table_data, styles, width, height, tools, tokens) -> list[object]:
+    result: list[object] = []
+    pending: list[tuple[PdfTableSpec, list[list[str]]]] = []
+
+    def flush_pending() -> None:
+        if not pending:
+            return
+        if len(pending) == 2 and all(
+            _is_two_column_table_candidate(spec, rows) for spec, rows in pending
+        ):
+            cards = [
+                _table_card(spec, rows, styles, width * 0.48, tools, tokens)
+                for spec, rows in pending
+            ]
+            max_card_height = height * PDF_TWO_COLUMN_MAX_HEIGHT_RATIO
+            if all(
+                flowable_fits(card, width * 0.48, max_card_height) for card in cards
+            ):
+                result.append(_two_column_row(cards, width, tools))
+                pending.clear()
+                return
+        for spec, rows in pending:
+            result.extend(_vertical_table_section(spec, rows, styles, width, tools, tokens))
+        pending.clear()
+
+    for spec in specs:
+        rows = table_data.get(spec.filename, [])
+        if spec.display_mode == "full":
+            flush_pending()
+            result.extend(_vertical_table_section(spec, rows, styles, width, tools, tokens))
+            continue
+        pending.append((spec, rows))
+        if len(pending) == 2:
+            flush_pending()
+    flush_pending()
+    return result
+
+
+def _is_two_column_table_candidate(spec: PdfTableSpec, rows: Sequence[Sequence[str]]) -> bool:
+    return spec.display_mode != "full" and max(len(rows) - 1, 0) <= PDF_TWO_COLUMN_MAX_ROWS
+
+
+def _two_column_row(cards: Sequence[object], width: float, tools) -> object:
+    grid = tools["Table"]([list(cards)], colWidths=[width * 0.49, width * 0.49])
     grid.setStyle(
         tools["TableStyle"](
             [
-                *spans,
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -432,26 +451,43 @@ def _table_grid(specs, table_data, styles, width, tools, tokens) -> list[object]
             ]
         )
     )
-    return [grid]
+    return grid
 
 
-def _table_card(spec, rows, styles, width, tools, tokens):
+def _vertical_table_section(spec, rows, styles, width, tools, tokens) -> list[object]:
+    body = _table_body(spec, rows, styles, width, tools, tokens)
+    result = [
+        tools["CondPageBreak"](styles["Heading2"].leading + 32),
+        tools["Paragraph"](spec.title, styles["Heading2"]),
+        body,
+    ]
+    note = visual_table_note(spec.filename)
+    if note:
+        result.append(tools["Paragraph"](note, styles["Note"]))
+    result.append(tools["Spacer"](1, 5))
+    return result
+
+
+def _table_body(spec, rows, styles, width, tools, tokens):
     if spec.display_mode == "callout" or (spec.filename == "warnings.csv" and len(rows) <= 1):
         if spec.filename == "warnings.csv" and len(rows) > 1:
             message = "<br/>".join(_serialize(row[-1]) for row in rows[1:] if row)
         else:
             message = rows[0][0] if rows else "Таблица не создана."
-        body = tools["Paragraph"](_serialize(message), styles["Callout"])
-    else:
-        body = _build_table(
-            rows,
-            styles,
-            width,
-            mode=spec.display_mode,
-            tools=tools,
-            tokens=tokens,
-            filename=spec.filename,
-        )
+        return tools["Paragraph"](_serialize(message), styles["Callout"])
+    return _build_table(
+        rows,
+        styles,
+        width,
+        mode=spec.display_mode,
+        tools=tools,
+        tokens=tokens,
+        filename=spec.filename,
+    )
+
+
+def _table_card(spec, rows, styles, width, tools, tokens):
+    body = _table_body(spec, rows, styles, width, tools, tokens)
     content = [[tools["Paragraph"](spec.title, styles["Heading2"])] , [body]]
     note = visual_table_note(spec.filename)
     if note:
@@ -487,7 +523,16 @@ def _chart_grid(charts, styles, width, height, tools) -> list[object]:
             continue
         if layout_mode == "vertical_stack_full_width":
             rows = [
-                [_chart_card(chart, styles, width * 0.96, height * 0.36, tools)]
+                [
+                    _chart_card(
+                        chart,
+                        styles,
+                        width * 0.96,
+                        height * 0.36,
+                        tools,
+                        fill_width=True,
+                    )
+                ]
                 for chart in page_charts
             ]
             grid = tools["Table"](rows, colWidths=[width])
@@ -577,11 +622,19 @@ def _chart_layout_mode(charts: Sequence[PdfChartSpec]) -> str:
     return "two_by_two"
 
 
-def _chart_card(chart, styles, max_width, max_height, tools):
+def _chart_card(chart, styles, max_width, max_height, tools, *, fill_width=False):
     card = tools["Table"](
         [
             [tools["Paragraph"](chart.title, styles["Heading3"])],
-            [_image(chart.image_path, max_width, max_height, tools)],
+            [
+                _image(
+                    chart.image_path,
+                    max_width,
+                    max_height,
+                    tools,
+                    fill_width=fill_width,
+                )
+            ],
         ],
         colWidths=[max_width],
     )
@@ -672,7 +725,12 @@ def _build_table(
         ]
         for row_index, row in enumerate(normalized)
     ]
-    table = tools["Table"](body, colWidths=col_widths, repeatRows=1 if len(rows) > 1 else 0)
+    table = tools["Table"](
+        body,
+        colWidths=col_widths,
+        repeatRows=1 if len(rows) > 1 else 0,
+        splitByRow=True,
+    )
     table.setStyle(
         tools["TableStyle"](
             [
@@ -781,8 +839,19 @@ def _column_widths_for_table(
     return _column_widths(rows, width)
 
 
-def _image(path: Path, max_width: float, max_height: float, tools: dict[str, Any]) -> Any:
+def _image(
+    path: Path,
+    max_width: float,
+    max_height: float,
+    tools: dict[str, Any],
+    *,
+    fill_width: bool = False,
+) -> Any:
     image = tools["Image"](str(path))
+    if fill_width:
+        image.drawWidth = max_width
+        image.drawHeight = max_height
+        return image
     ratio = min(max_width / image.drawWidth, max_height / image.drawHeight, 1)
     image.drawWidth *= ratio
     image.drawHeight *= ratio

@@ -4,8 +4,10 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from openpyxl import load_workbook
+from reportlab.platypus.doctemplate import LayoutError
 from typer.testing import CliRunner
 
+import expense_splitter.cli as cli
 from expense_splitter.calculator import calculate_balances
 from expense_splitter.cli import app
 from expense_splitter.current_report import (
@@ -261,3 +263,23 @@ def test_cli_current_report_generates_requested_outputs(tmp_path):
     assert len(report_dirs) == 1
     assert (report_dirs[0] / "current_state_dashboard.html").is_file()
     assert not (report_dirs[0] / "current_state.xlsx").exists()
+
+
+def test_cli_current_report_hides_raw_reportlab_layout_error(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    initialize_data_files(data_dir, [], [])
+    monkeypatch.setattr(
+        cli,
+        "generate_current_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(LayoutError("raw details")),
+    )
+
+    result = runner.invoke(
+        app,
+        ["current-report", "--format", "pdf", "--data-dir", str(data_dir)],
+    )
+
+    assert result.exit_code == 2
+    assert cli.PDF_LAYOUT_ERROR_MESSAGE in result.stdout
+    assert "raw details" not in result.stdout
+    assert "Traceback" not in result.stdout

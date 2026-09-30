@@ -287,7 +287,9 @@ metadata, expense charts start from zero, and the balance table explains the sig
 balance.
 
 PDF uses a compact A4 landscape layout: the first page shows KPI cards, short tables share a
-two-column grid, and charts are grouped adaptively. Four compact charts use a 2x2 grid; two
+two-column grid only while both blocks fit safely. Tall or wrapped tables fall back to a vertical,
+page-splittable layout instead of being nested in an indivisible two-column row. Four compact
+charts use a 2x2 grid; two
 remaining charts use a vertical full-width stack. Analytics keeps the full purchases
 table in `Приложение: все покупки`; current and settlement reports add the appendix only above the
 main-table limit. CSV and XLSX continue to contain the complete detail.

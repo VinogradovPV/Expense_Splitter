@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import tkinter as tk
 from datetime import date
 from pathlib import Path
 from tkinter import messagebox, simpledialog, ttk
+
+from reportlab.platypus.doctemplate import LayoutError
 
 from expense_splitter.gui import actions
 from expense_splitter.gui.dialogs import (
@@ -18,6 +21,7 @@ from expense_splitter.gui.dialogs import (
 )
 from expense_splitter.gui.state import GuiState
 from expense_splitter.gui.widgets import clear_tree, make_tree
+from expense_splitter.report_pdf import PDF_LAYOUT_ERROR_MESSAGE
 from expense_splitter.ui_labels import (
     label_for_period_filter,
     label_for_period_status,
@@ -29,6 +33,7 @@ from expense_splitter.ui_labels import (
 PURCHASE_FILTER_VALUES = ("all", "open", "settled")
 PERIOD_FILTER_VALUES = ("all", "closed", "reopened", "empty", "with_purchases")
 REPORT_FORMAT_VALUES = ("markdown", "csv", "png", "html", "xlsx", "pdf", "all")
+logger = logging.getLogger(__name__)
 
 
 class ExpenseSplitterGui:
@@ -461,6 +466,11 @@ class ExpenseSplitterGui:
     def run_safely(self, action, success_status: str | None = None):
         try:
             result = action()
+        except LayoutError:
+            logger.exception("ReportLab failed to lay out the PDF report")
+            messagebox.showerror("Ошибка", PDF_LAYOUT_ERROR_MESSAGE, parent=self.root)
+            self.status_var.set("Ошибка")
+            return None
         except Exception as error:
             messagebox.showerror("Ошибка", str(error), parent=self.root)
             self.status_var.set("Ошибка")

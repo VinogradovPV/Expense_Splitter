@@ -170,8 +170,10 @@ considered a defect. Chart sections use Russian user-facing titles, while intern
 only in filenames and metadata. Non-negative expense charts start their X scale at zero; the balance
 chart may use negative values and the balance table includes an explanation of the sign.
 
-The compact A4 landscape layout uses KPI cards, two-column table sections and an adaptive chart
-grid: four compact charts use 2x2, while two remaining charts are stacked at full width.
+The compact A4 landscape layout uses KPI cards, safe two-column table sections and an adaptive
+chart grid. A table pair uses two columns only when both blocks fit below the page-height safety
+threshold; otherwise the tables are stacked vertically and can split by row across pages. Four
+compact charts use 2x2, while two remaining charts are stacked at full width.
 The main analytics pages no longer repeat the summary table or print every purchase. Full purchase
 detail is rendered in `Приложение: все покупки` and remains unchanged in CSV/XLSX.
 Participant, payer, category and purchase labels are sourced from the real report dataset. Every

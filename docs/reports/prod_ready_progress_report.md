@@ -1453,3 +1453,28 @@ visual layer теперь гарантирует, что compact labels сохр
 - `python -m compileall -q src tests`, UTF-8 check, Ruff и `git diff --check`: OK.
 - Manual smoke: current-report — 4 непустые страницы; полные имена присутствуют без сокращений,
   два последних графика расположены вертикально на всю ширину; визуальный PNG-review — OK.
+
+## P2.RPT.7.4 — Безопасная компоновка oversized PDF flowables
+
+Дата: 2026-09-30
+Статус: implemented on `cloud/telegram-prep`.
+
+- Двухколоночная строка создается только для двух небольших таблиц, каждая из которых занимает не
+  более 45% полезной высоты страницы; большие блоки автоматически размещаются вертикально.
+- Таблицы покупок, балансов и расходов в вертикальной компоновке являются самостоятельными
+  flowables, используют `repeatRows=1` и `splitByRow=True` и не оборачиваются целиком в
+  `KeepTogether` или ячейку внешней таблицы.
+- Два горизонтальных bar chart размещаются вертикально, а их изображения растягиваются на всю
+  доступную ширину страницы.
+- GUI перехватывает `LayoutError`, пишет техническую ошибку в log и показывает контролируемое
+  пользовательское сообщение без raw ReportLab traceback.
+- Расчеты, settlement semantics, YAML и форматы HTML/XLSX/CSV/Markdown не изменены.
+
+### Проверки
+
+- Focused PDF/layout/controlled-error tests: 35 passed.
+- Full suite: 298 passed.
+- `python -m compileall -q src tests`, UTF-8 check, Ruff и `git diff --check`: OK.
+- Manual smoke: current-report — 5 непустых страниц; длинная таблица покупок разбита между
+  страницами; полные имена участников сохранены; два последних графика визуально занимают полную
+  ширину; PNG-review всех страниц — OK.

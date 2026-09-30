@@ -2,8 +2,10 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
+from reportlab.platypus.doctemplate import LayoutError
 
 from expense_splitter.gui import actions
+from expense_splitter.gui import app as gui_app
 from expense_splitter.gui.dialogs import (
     normalize_known_values,
     parse_comma_separated,
@@ -26,6 +28,26 @@ def make_state(tmp_path):
     state = GuiState(data_dir=tmp_path / "data", reports_dir=tmp_path / "reports")
     state.ensure_data_files()
     return state
+
+
+def test_gui_hides_raw_reportlab_layout_error(monkeypatch, caplog):
+    messages = []
+    gui = gui_app.ExpenseSplitterGui.__new__(gui_app.ExpenseSplitterGui)
+    gui.root = object()
+    gui.status_var = type("Status", (), {"set": lambda self, value: None})()
+    monkeypatch.setattr(
+        gui_app.messagebox,
+        "showerror",
+        lambda title, message, parent=None: messages.append((title, message)),
+    )
+
+    with caplog.at_level("ERROR"):
+        result = gui.run_safely(lambda: (_ for _ in ()).throw(LayoutError("raw details")))
+
+    assert result is None
+    assert messages == [("Ошибка", gui_app.PDF_LAYOUT_ERROR_MESSAGE)]
+    assert "raw details" not in messages[0][1]
+    assert "ReportLab failed to lay out" in caplog.text
 
 
 def test_manual_participant_parser_and_category_multi_select_values():
