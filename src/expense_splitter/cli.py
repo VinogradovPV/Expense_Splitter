@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import typer
+from reportlab.platypus.doctemplate import LayoutError
 from rich.console import Console
 from rich.table import Table
 
@@ -13,6 +14,7 @@ from expense_splitter.calculator import calculate_balances
 from expense_splitter.current_report import build_current_report_dataset, generate_current_report
 from expense_splitter.defaults import DEFAULT_GROUPS, DEFAULT_PARTICIPANTS, EXAMPLE_PURCHASES
 from expense_splitter.models import DEFAULT_PURCHASE_NAME, Purchase
+from expense_splitter.report_pdf import PDF_LAYOUT_ERROR_MESSAGE
 from expense_splitter.reporting import generate_markdown_report
 from expense_splitter.settlement import calculate_settlements
 from expense_splitter.settlement_period_report import (
@@ -535,6 +537,9 @@ def settlement_period_report_command(
         report_dir = generate_settlement_period_report(dataset, output_root, output_format)
     except StorageError as error:
         handle_storage_error(error)
+    except LayoutError as error:
+        typer.echo(PDF_LAYOUT_ERROR_MESSAGE)
+        raise typer.Exit(2) from error
     except SettlementPeriodReportError as error:
         typer.echo(str(error))
         raise typer.Exit(2) from error
@@ -595,6 +600,9 @@ def analytics_command(
         report_dir = generate_analytics_report(dataset, output_root, output_format)
     except StorageError as error:
         handle_storage_error(error)
+    except LayoutError as error:
+        typer.echo(PDF_LAYOUT_ERROR_MESSAGE)
+        raise typer.Exit(2) from error
     except ValueError as error:
         typer.echo(f"Analytics error: {error}")
         raise typer.Exit(2) from error
@@ -621,6 +629,9 @@ def current_report_command(
         report_dir = generate_current_report(dataset, output_root, output_format)
     except StorageError as error:
         handle_storage_error(error)
+    except LayoutError as error:
+        typer.echo(PDF_LAYOUT_ERROR_MESSAGE)
+        raise typer.Exit(2) from error
     except ValueError as error:
         typer.echo(f"Current report error: {error}")
         raise typer.Exit(2) from error

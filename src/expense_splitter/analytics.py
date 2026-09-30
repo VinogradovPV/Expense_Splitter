@@ -47,6 +47,12 @@ class AnalyticsDataset:
     warnings: list[dict[str, object]]
 
 
+@dataclass(frozen=True)
+class DailySpendingPoint:
+    day: date
+    amount: Decimal
+
+
 def parse_period(
     period: str,
     year: int,
@@ -163,6 +169,15 @@ def aggregate_summary(
         "average_purchase": average_purchase,
         "participant_count": len(_participant_names(participants)),
     }
+
+
+def aggregate_daily_spending(purchases: Sequence[Purchase]) -> list[DailySpendingPoint]:
+    totals: dict[date, Decimal] = {}
+    for purchase in purchases:
+        if purchase.date is None:
+            continue
+        totals[purchase.date] = totals.get(purchase.date, Decimal("0.00")) + purchase.amount
+    return [DailySpendingPoint(day, totals[day]) for day in sorted(totals)]
 
 
 def aggregate_by_category(purchases: Sequence[Purchase]) -> list[dict[str, object]]:

@@ -89,7 +89,7 @@ def test_xlsx_report_contains_required_sheets_and_russian_data(tmp_path):
     payer_share_cell = by_payer.cell(4, payer_headers.index("Доля оплат, %") + 1)
     assert payer_share_cell.value == 100
     assert payer_share_cell.number_format == "#,##0.00"
-    assert len(workbook["Графики"]._images) == 6
+    assert len(workbook["Графики"]._images) == 5
     with ZipFile(path) as archive:
         assert not any(name.startswith("xl/tables/") for name in archive.namelist())
 

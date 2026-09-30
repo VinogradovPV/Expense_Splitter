@@ -4,8 +4,10 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from openpyxl import load_workbook
+from reportlab.platypus.doctemplate import LayoutError
 from typer.testing import CliRunner
 
+import expense_splitter.cli as cli
 from expense_splitter.calculator import calculate_balances
 from expense_splitter.cli import app
 from expense_splitter.current_report import (
@@ -165,12 +167,19 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     assert "# Отчет по текущим взаиморасчетам" in markdown
     assert "Какие покупки включены: Открытые покупки" in markdown
     assert "Доля оплат, %" in markdown
+    assert "Объем расходов на человека" in markdown
+    assert "Итог: + получит, − должен" in markdown
+    assert "Итоговый баланс" not in markdown
+    assert "Положительный итоговый баланс означает" in markdown
     assert markdown.index("## Итоговые переводы") < markdown.index("## Расходы по категориям")
     html = (report_dir / "current_state_dashboard.html").read_text(encoding="utf-8")
     assert '<meta charset="UTF-8">' in html
     assert "Отчет по текущим взаиморасчетам" in html
     assert "Доля оплат, %" in html
     assert "Объем расходов на человека" in html
+    assert "Итог: + получит, − должен" in html
+    assert "Итоговый баланс" not in html
+    assert "Положительный итоговый баланс означает" in html
     assert "payer_total" not in html
     assert "payer_rank" not in html
     assert html.index("Итоговые переводы") < html.index("Покупки")
@@ -200,6 +209,16 @@ def test_current_report_csv_html_markdown_and_xlsx_are_readable(tmp_path):
     )
     payer_sheet = workbook["По плательщикам"]
     assert "Доля оплат, %" in [cell.value for cell in payer_sheet[3]]
+    participant_sheet = workbook["Объем расходов на человека"]
+    assert "Доля расходов" not in [cell.value for cell in participant_sheet[3]]
+    assert "Объем расходов на человека" in [cell.value for cell in participant_sheet[3]]
+    balances_sheet = workbook["Балансы участников"]
+    balance_headers = [cell.value for cell in balances_sheet[3]]
+    assert "Доля" not in balance_headers
+    assert "Баланс" not in balance_headers
+    assert "Объем расходов на человека" in balance_headers
+    assert "Итоговый баланс" not in balance_headers
+    assert "Итог: + получит, − должен" in balance_headers
 
 
 def test_empty_open_scope_writes_metadata_summary_and_warning(tmp_path):
@@ -244,3 +263,23 @@ def test_cli_current_report_generates_requested_outputs(tmp_path):
     assert len(report_dirs) == 1
     assert (report_dirs[0] / "current_state_dashboard.html").is_file()
     assert not (report_dirs[0] / "current_state.xlsx").exists()
+
+
+def test_cli_current_report_hides_raw_reportlab_layout_error(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    initialize_data_files(data_dir, [], [])
+    monkeypatch.setattr(
+        cli,
+        "generate_current_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(LayoutError("raw details")),
+    )
+
+    result = runner.invoke(
+        app,
+        ["current-report", "--format", "pdf", "--data-dir", str(data_dir)],
+    )
+
+    assert result.exit_code == 2
+    assert cli.PDF_LAYOUT_ERROR_MESSAGE in result.stdout
+    assert "raw details" not in result.stdout
+    assert "Traceback" not in result.stdout

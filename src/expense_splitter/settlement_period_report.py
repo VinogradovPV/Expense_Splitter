@@ -41,7 +41,12 @@ from expense_splitter.models import (
 )
 from expense_splitter.report_pdf import PdfTableSpec, write_pdf_report
 from expense_splitter.report_sorting import sorted_purchases_with_payer_totals
-from expense_splitter.report_tables import chart_display_title, rows_for_visual_table
+from expense_splitter.report_tables import (
+    BALANCE_EXPLANATION,
+    BALANCE_RESULT_HEADER,
+    chart_display_title,
+    rows_for_visual_table,
+)
 from expense_splitter.settlement_periods import get_settlement_period
 from expense_splitter.ui_labels import (
     label_for_period_status,
@@ -68,14 +73,18 @@ TABLE_SPECS = (
 )
 
 SETTLEMENT_PERIOD_PDF_TABLES = (
-    PdfTableSpec("summary.csv", "Сводка"),
-    PdfTableSpec("by_category.csv", "Расходы по категориям"),
-    PdfTableSpec("by_payer.csv", "Расходы по плательщикам"),
-    PdfTableSpec("by_participant.csv", "Объем расходов на человека"),
-    PdfTableSpec("balances.csv", "Балансы"),
-    PdfTableSpec("settlements.csv", "Итоговые переводы"),
-    PdfTableSpec("purchases.csv", "Покупки периода"),
-    PdfTableSpec("warnings.csv", "Предупреждения"),
+    PdfTableSpec(
+        "settlements.csv",
+        "Итоговые переводы",
+        display_mode="financial",
+        section="overview",
+    ),
+    PdfTableSpec("by_payer.csv", "Расходы по плательщикам", section="overview"),
+    PdfTableSpec("by_category.csv", "Расходы по категориям", section="overview"),
+    PdfTableSpec("warnings.csv", "Предупреждения", display_mode="callout", section="overview"),
+    PdfTableSpec("by_participant.csv", "Объем расходов на человека", section="participants"),
+    PdfTableSpec("balances.csv", "Балансы", display_mode="financial", section="participants"),
+    PdfTableSpec("purchases.csv", "Покупки периода", display_mode="full", section="participants"),
 )
 
 
@@ -215,8 +224,23 @@ def generate_settlement_period_report(
                 title=REPORT_TITLE,
                 metadata_rows=_summary_rows(dataset),
                 tables_dir=tables_dir,
-                table_specs=SETTLEMENT_PERIOD_PDF_TABLES,
+                table_specs=(
+                    *SETTLEMENT_PERIOD_PDF_TABLES,
+                    *(
+                        (
+                            PdfTableSpec(
+                                "purchases.csv",
+                                "Все покупки",
+                                display_mode="appendix",
+                                section="appendix",
+                            ),
+                        )
+                        if len(dataset.purchases) > 15
+                        else ()
+                    ),
+                ),
                 charts_dir=charts_dir,
+                report_kind="settlement",
             )
         )
 
@@ -383,7 +407,7 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Объем расходов на человека",
-        ["Участник", "Доля расходов", "Покупок"],
+        ["Участник", "Объем расходов на человека", "Покупок"],
         (
             [row["participant"], row["total_share"], row["purchase_count"]]
             for row in dataset.by_participant
@@ -392,9 +416,10 @@ def write_settlement_period_markdown(
     _append_markdown_table(
         lines,
         "Балансы",
-        ["Участник", "Оплачено", "Доля", "Баланс"],
+        ["Участник", "Оплачено", "Объем расходов на человека", BALANCE_RESULT_HEADER],
         ([row.participant, row.paid, row.share, row.net] for row in dataset.balances),
     )
+    lines.extend([BALANCE_EXPLANATION, ""])
     _append_markdown_table(
         lines,
         "Итоговые переводы",
@@ -808,5 +833,5 @@ def _chart_warning(filename: str) -> dict[str, object]:
         "chart_no_data",
         "",
         "",
-        f"График {filename} не создан: нет данных для settlement period.",
+        f"График «{chart_display_title(filename)}» не создан: нет данных для settlement period.",
     )

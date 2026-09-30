@@ -73,6 +73,7 @@ CHART_COLOR_STRATEGIES = {
     "spending_by_payer.png": "qualitative_palette_by_payer",
     "participant_share.png": "qualitative_palette_by_participant",
     "balances.png": "balance_status_map",
+    "operations_by_day.png": "period_chronological_sequential",
     "period_trend.png": "period_chronological_sequential",
     "top_purchases.png": "qualitative_palette_by_rank",
 }

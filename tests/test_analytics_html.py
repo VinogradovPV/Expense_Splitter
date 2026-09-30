@@ -60,7 +60,9 @@ def test_html_report_handles_missing_charts(tmp_path):
     report_dir = generate_analytics_report(dataset(False), tmp_path, "html")
     text = (report_dir / "analytics_dashboard.html").read_text(encoding="utf-8")
 
-    assert text.count("График не создан: нет данных за выбранный период.") == 6
+    assert "Недостаточно дат для построения динамики расходов." not in text
+    assert "График не создан: нет данных за выбранный период." not in text
+    assert 'src="charts/' not in text
 
 
 def test_all_format_includes_html(tmp_path):
