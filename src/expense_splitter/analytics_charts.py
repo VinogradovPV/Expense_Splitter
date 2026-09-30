@@ -116,9 +116,15 @@ def _save_barh(
     *,
     non_negative_x_axis: bool = False,
     value_label_colors: list[str] | None = None,
+    wide: bool = False,
 ) -> None:
-    height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
-    fig, ax = plt.subplots(figsize=(10, height))
+    if wide:
+        height = max(3.0, min(3.8, 1.8 + len(labels) * 0.2))
+        figure_size = (14, height)
+    else:
+        height = max(4.0, min(9.0, 1.0 + len(labels) * 0.5))
+        figure_size = (10, height)
+    fig, ax = plt.subplots(figsize=figure_size)
     positions = range(len(labels))
     bars = ax.barh(positions, values, color=colors)
     ax.set_yticks(list(positions), labels=labels)
@@ -215,6 +221,7 @@ def _spending_by_payer(dataset: AnalyticsDataset, path: Path) -> None:
         "Расходы по плательщикам",
         "Сумма",
         non_negative_x_axis=True,
+        wide=True,
     )
 
 
@@ -315,4 +322,5 @@ def _top_purchases(dataset: AnalyticsDataset, path: Path) -> None:
         "Крупнейшие покупки",
         "Сумма",
         non_negative_x_axis=True,
+        wide=True,
     )

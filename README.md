@@ -289,8 +289,10 @@ balance.
 PDF uses a compact A4 landscape layout: the first page shows KPI cards, short tables share a
 two-column grid only while both blocks fit safely. Tall or wrapped tables fall back to a vertical,
 page-splittable layout instead of being nested in an indivisible two-column row. Four compact
-charts use a 2x2 grid; two
-remaining charts use a vertical full-width stack. Analytics keeps the full purchases
+charts use a 2x2 grid; two remaining charts use a vertical full-width stack. Horizontal full-width
+charts are rendered in a
+native wide aspect ratio and scaled proportionally, so text and chart geometry are not distorted.
+Analytics keeps the full purchases
 table in `Приложение: все покупки`; current and settlement reports add the appendix only above the
 main-table limit. CSV and XLSX continue to contain the complete detail.
 Participant, payer and purchase labels always come from report data. Purchase tables in every PDF

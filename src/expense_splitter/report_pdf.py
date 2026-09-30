@@ -523,16 +523,7 @@ def _chart_grid(charts, styles, width, height, tools) -> list[object]:
             continue
         if layout_mode == "vertical_stack_full_width":
             rows = [
-                [
-                    _chart_card(
-                        chart,
-                        styles,
-                        width * 0.96,
-                        height * 0.36,
-                        tools,
-                        fill_width=True,
-                    )
-                ]
+                [_chart_card(chart, styles, width * 0.96, height * 0.36, tools)]
                 for chart in page_charts
             ]
             grid = tools["Table"](rows, colWidths=[width])
@@ -622,19 +613,11 @@ def _chart_layout_mode(charts: Sequence[PdfChartSpec]) -> str:
     return "two_by_two"
 
 
-def _chart_card(chart, styles, max_width, max_height, tools, *, fill_width=False):
+def _chart_card(chart, styles, max_width, max_height, tools):
     card = tools["Table"](
         [
             [tools["Paragraph"](chart.title, styles["Heading3"])],
-            [
-                _image(
-                    chart.image_path,
-                    max_width,
-                    max_height,
-                    tools,
-                    fill_width=fill_width,
-                )
-            ],
+            [_image(chart.image_path, max_width, max_height, tools)],
         ],
         colWidths=[max_width],
     )
@@ -844,14 +827,8 @@ def _image(
     max_width: float,
     max_height: float,
     tools: dict[str, Any],
-    *,
-    fill_width: bool = False,
 ) -> Any:
     image = tools["Image"](str(path))
-    if fill_width:
-        image.drawWidth = max_width
-        image.drawHeight = max_height
-        return image
     ratio = min(max_width / image.drawWidth, max_height / image.drawHeight, 1)
     image.drawWidth *= ratio
     image.drawHeight *= ratio

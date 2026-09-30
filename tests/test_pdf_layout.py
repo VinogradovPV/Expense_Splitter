@@ -47,27 +47,16 @@ def test_two_remaining_charts_use_vertical_full_width_stack(tmp_path):
     assert _chart_layout_mode(charts) == "vertical_stack_full_width"
 
 
-def test_vertical_chart_stack_expands_images_to_full_width(tmp_path, monkeypatch):
-    charts = [
-        PdfChartSpec("spending_by_payer", "Расходы по плательщикам", tmp_path / "a.png"),
-        PdfChartSpec("top_purchases", "Крупнейшие покупки", tmp_path / "b.png"),
-    ]
+def test_pdf_image_scaling_preserves_source_aspect_ratio(tmp_path):
+    pillow = pytest.importorskip("PIL.Image")
+    image_path = tmp_path / "wide.png"
+    pillow.new("RGB", (1400, 400), "white").save(image_path)
     tools = report_pdf._load_reportlab_layout_tools()
-    styles = report_pdf._styles(report_pdf.ensure_pdf_font(), tools)
-    calls = []
+    image = report_pdf._image(image_path, 700, 250, tools)
 
-    def fake_chart_card(chart, styles, max_width, max_height, tools, *, fill_width=False):
-        calls.append((chart.key, max_width, fill_width))
-        return tools["Paragraph"](chart.title, styles["BodyText"])
-
-    monkeypatch.setattr(report_pdf, "_chart_card", fake_chart_card)
-
-    report_pdf._chart_grid(charts, styles, 700, 500, tools)
-
-    assert calls == [
-        ("spending_by_payer", pytest.approx(672), True),
-        ("top_purchases", pytest.approx(672), True),
-    ]
+    assert image.drawWidth == pytest.approx(700)
+    assert image.drawHeight == pytest.approx(200)
+    assert image.drawWidth / image.drawHeight == pytest.approx(3.5)
 
 
 def test_four_charts_keep_two_by_two_grid(tmp_path):

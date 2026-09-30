@@ -83,6 +83,7 @@ def test_current_report_top_purchases_chart_keeps_largest_purchase_first(tmp_pat
     def fake_save_barh(path, labels, values, colors, title, xlabel, **kwargs):
         captured["labels"] = labels
         captured["values"] = values
+        captured["wide"] = kwargs["wide"]
 
     monkeypatch.setattr("expense_splitter.current_report._save_barh", fake_save_barh)
 
@@ -90,6 +91,7 @@ def test_current_report_top_purchases_chart_keeps_largest_purchase_first(tmp_pat
 
     assert captured["labels"] == ["large", "middle", "small"]
     assert captured["values"] == [760.0, 196.0, 90.0]
+    assert captured["wide"] is True
 
 
 def test_current_report_one_unique_date_skips_operations_by_day_with_warning(tmp_path):

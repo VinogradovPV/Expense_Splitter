@@ -178,6 +178,7 @@ def test_top_purchases_chart_keeps_largest_purchase_first(tmp_path, monkeypatch)
     def fake_save_barh(path, labels, values, colors, title, xlabel, **kwargs):
         captured["labels"] = labels
         captured["values"] = values
+        captured["wide"] = kwargs["wide"]
 
     monkeypatch.setattr("expense_splitter.analytics_charts._save_barh", fake_save_barh)
 
@@ -185,6 +186,7 @@ def test_top_purchases_chart_keeps_largest_purchase_first(tmp_path, monkeypatch)
 
     assert captured["labels"] == ["Large", "Middle", "Small"]
     assert captured["values"] == [760.0, 196.0, 90.0]
+    assert captured["wide"] is True
 
 
 def test_empty_dataset_returns_warnings_instead_of_failing(tmp_path):
